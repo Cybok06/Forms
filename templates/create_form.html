@@ -8,7 +8,6 @@
 <link rel="icon" href="https://store-images.s-microsoft.com/image/apps.44537.13628881801009959.f429098c-f6ba-4196-a164-1109adc458e8.5f1e249b-7942-4e1d-aa67-487271e222e5" type="image/x-icon">
 
 <style>
-  /* ===== Tokens ===== */
   :root{
     --ink:#0b1320; --muted:#64748b; --ring:#e9ecef; --soft:#f6f8fb; --brand:#0ea5e9; --ok:#16a34a;
     --card:#ffffff; --shadow:0 12px 36px rgba(2,6,23,.08);
@@ -117,7 +116,6 @@
         <input id="formImage" type="file" class="form-control" accept="image/*"/>
         <div class="form-text">Stored in GridFS; shows above the form title.</div>
 
-        <!-- Upload state + Preview -->
         <div class="mt-2" id="imgState" style="display:none;">
           <div class="d-flex align-items-center gap-2">
             <div class="spinner-border spinner-border-sm text-primary" role="status" aria-hidden="true"></div>
@@ -168,11 +166,29 @@
               <option value="tel">Phone</option>
               <option value="date">Date</option>
               <option value="textarea">Textarea</option>
+              <option value="select">Select (Dropdown)</option>
             </select>
           </div>
+
+          <!-- Options area (shown when type = select) -->
+          <div class="col-12" id="optionsWrap" style="display:none;">
+            <label class="form-label">Options</label>
+            <textarea id="fOptions" class="form-control" rows="3" placeholder="Male
+Female
+Prefer not to say"></textarea>
+            <div class="form-text">
+              One option per line (or comma-separated). First value will be the default unless changed later.
+            </div>
+            <div class="mt-2">
+              <label class="form-label">Default (optional)</label>
+              <input id="fDefault" class="form-control" placeholder="(must match one of the options)"/>
+            </div>
+          </div>
+
           <div class="col-12">
             <label class="form-label">Placeholder</label>
             <input id="fPlaceholder" class="form-control" placeholder="e.g., Enter your full name"/>
+            <div class="form-text">Ignored for Select fields.</div>
           </div>
           <div class="col-6">
             <label class="form-label">Required</label>
@@ -184,7 +200,7 @@
           <div class="col-6">
             <label class="form-label">Format (mask)</label>
             <input id="fFormat" class="form-control" placeholder="e.g., 0XXXXXXXX"/>
-            <div class="form-text">X = digit, A = letter, * = any char</div>
+            <div class="form-text">X = digit, A = letter, * = any char (not used for Select/Date/Textarea).</div>
           </div>
           <div class="col-12 d-grid">
             <button id="addFieldBtn" class="btn btn-dark btn-icon">
@@ -196,7 +212,7 @@
       </div>
     </div>
 
-    <!-- Live Preview -->
+    <!-- Live Preview (list of field chips) -->
     <div class="col-lg-7">
       <div class="cardx p-3 pv-wrap" id="pvWrap">
         <div class="d-flex align-items-center justify-content-between">
@@ -214,14 +230,12 @@
   </div>
 </div>
 
-<!-- Safe JSON config (no JS parsing of Jinja) -->
 <script id="__config" type="application/json">
 {{ {'edit_slug': edit_slug}|tojson }}
 </script>
 
 <script>
 (function(){
-  // Read server config safely
   const __cfgEl = document.getElementById('__config');
   let __cfg = {};
   try { __cfg = JSON.parse(__cfgEl?.textContent || '{}'); } catch {}
@@ -251,7 +265,7 @@
 
   function uid(){ return "f_" + Math.random().toString(36).slice(2,9); }
 
-  /* ===== Title & Description binding ===== */
+  // Title & description
   function syncTitle(){
     const t = $("#formTitle").value.trim();
     state.title = t;
@@ -268,7 +282,7 @@
   }
   $("#formDesc").addEventListener("input", syncDesc);
 
-  /* ===== Theme picker ===== */
+  // Theme picker
   function renderThemes(){
     const wrap = $("#themeList");
     wrap.innerHTML = "";
@@ -304,14 +318,13 @@
     pvWrap.style.setProperty('--pv-soft', th.soft);
     pvWrap.style.setProperty('--pv-brand', th.brand);
     pvWrap.style.setProperty('--pv-ok', th.ok);
-    // Update UI
     [...document.querySelectorAll('.theme-card')].forEach(el=>el.setAttribute('aria-checked','false'));
     const i = THEMES.findIndex(t=>t.key===th.key);
     const el = document.querySelectorAll('.theme-card')[i];
     if(el) el.setAttribute('aria-checked','true');
   }
 
-  /* ===== Image auto-upload (GridFS) ===== */
+  // Image upload
   const formImageInput = $("#formImage");
   const imgWrap = $("#imgWrap");
   const imgPreview = $("#imgPreview");
@@ -322,28 +335,19 @@
   formImageInput.addEventListener("change", async ()=>{
     const file = formImageInput.files && formImageInput.files[0];
     if(!file) return;
-
-    // Simple type guard (client-side)
     if(!file.type.startsWith("image/")){
       alert("Please choose a valid image file.");
       formImageInput.value = "";
       return;
     }
-
-    // Show uploading UI
     setUploading(true);
-
     const fd = new FormData();
     fd.append("image", file);
     try{
       const res = await fetch("/api/upload", { method:"POST", body:fd });
       const data = await res.json();
-      if(!res.ok || !data.ok){
-        throw new Error(data.error || "Upload failed");
-      }
+      if(!res.ok || !data.ok) throw new Error(data.error || "Upload failed");
       state.form_image_id = data.file_id;
-
-      // Show preview
       imgWrap.style.display = "";
       imgPreview.src = `/file/${data.file_id}`;
       imgStatusNote.textContent = "Uploaded ✓";
@@ -351,7 +355,6 @@
     }catch(err){
       console.error(err);
       toast("Image upload failed");
-      // Revert
       formImageInput.value = "";
     }finally{
       setUploading(false);
@@ -370,14 +373,51 @@
     }
   }
 
-  /* ===== Fields ===== */
+  // ===== Field builder =====
+  const fType = $("#fType");
+  const optionsWrap = $("#optionsWrap");
+  const fOptions = $("#fOptions");
+  const fDefault = $("#fDefault");
+
+  function toggleOptions(){
+    const t = fType.value;
+    if(t === "select"){
+      optionsWrap.style.display = "";
+    }else{
+      optionsWrap.style.display = "none";
+      fOptions.value = "";
+      fDefault.value = "";
+    }
+  }
+  fType.addEventListener("change", toggleOptions);
+  toggleOptions();
+
+  function parseOptions(text){
+    const parts = text.split(/\n|,/).map(s => s.trim()).filter(Boolean);
+    // unique, preserve order
+    const seen = new Set();
+    const out = [];
+    for(const p of parts){
+      const key = p.toLowerCase();
+      if(seen.has(key)) continue;
+      seen.add(key);
+      out.push(p.slice(0,80));
+      if(out.length >= 100) break;
+    }
+    return out;
+  }
+
   function fieldChip(f){
     const div = document.createElement("div");
     const fmt = f.format ? ` <small class="text-muted">[${f.format}]</small>` : "";
+    const optInfo = (f.type === "select" && Array.isArray(f.options) && f.options.length)
+      ? ` <small class="text-muted">• options: ${f.options.slice(0,4).join(", ")}${f.options.length>4?"…":""}</small>`
+      : "";
+    const defInfo = (f.type === "select" && f.default) ? ` <small class="text-muted">• default: ${f.default}</small>` : "";
     div.className = "chip";
     div.innerHTML = `
       <div class="meta">
-        <strong>${f.label}</strong> <small>(${f.type})</small>${fmt}
+        <strong>${f.label}</strong> <small>(${f.type})</small>${fmt}${optInfo}${defInfo}
         ${f.required ? ` <small class="text-danger">• required</small>` : ``}
       </div>
       <div class="act d-flex align-items-center gap-1">
@@ -415,23 +455,41 @@
 
   $("#addFieldBtn").addEventListener("click", ()=>{
     const label = $("#fLabel").value.trim();
-    if(!label){ alert("Label is required."); return; }
+    if(!label){ alert("Label is required."); $("#fLabel").focus(); return; }
     const type = $("#fType").value;
-    const id = uid(); // temp client id; server derives final id from label
+    const id = uid(); // temp id; server derives final id from label
     const required = $("#fRequired").value === "true";
     const f = { id, label, type, required };
 
-    const ph = $("#fPlaceholder").value.trim(); if(ph) f.placeholder = ph;
-    const fmt = $("#fFormat").value.trim(); if(fmt) f.format = fmt;
+    // Placeholder (ignored for select)
+    const ph = $("#fPlaceholder").value.trim();
+    if(ph && type !== "select") f.placeholder = ph;
+
+    // Mask (not for select/date/textarea)
+    const fmt = $("#fFormat").value.trim();
+    if(fmt && !["select","date","textarea"].includes(type)) f.format = fmt;
+
+    if(type === "select"){
+      const opts = parseOptions($("#fOptions").value);
+      if(opts.length === 0){
+        alert("Add at least one option for the Select field.");
+        $("#fOptions").focus();
+        return;
+      }
+      f.options = opts;
+      const def = $("#fDefault").value.trim();
+      if(def && opts.includes(def)) f.default = def;
+    }
 
     state.fields.push(f);
     renderFields();
 
-    ["#fLabel","#fPlaceholder","#fFormat"].forEach(s=> $(s).value="");
-    $("#fRequired").value = "false"; $("#fType").value = "text";
+    // reset inputs
+    ["#fLabel","#fPlaceholder","#fFormat","#fOptions","#fDefault"].forEach(s=> $(s).value="");
+    $("#fRequired").value = "false"; $("#fType").value = "text"; toggleOptions();
   });
 
-  /* ===== Save (Create or Update) ===== */
+  // Save (Create or Update)
   $("#saveBtn").addEventListener("click", async ()=>{
     if(!state.title){ alert("Form Title is required."); $("#formTitle").focus(); return; }
     if(state.fields.length === 0){ alert("Add at least one field."); return; }
@@ -461,21 +519,18 @@
       }
       data = await res.json();
       if(!data.ok){ alert(data.error || "Save failed"); return; }
-
-      // After save/update, go to public view
       window.location = data.view_url;
     }catch(e){ console.error(e); alert("Network error"); }
   });
 
-  /* ===== Prefill for Edit Mode ===== */
+  // Prefill in edit mode
   async function prefillIfEditing(){
-    if(!state.editSlug){ // new
+    if(!state.editSlug){
       state.theme = {...THEMES[0]};
       renderThemes(); selectTheme(THEMES[0]);
       syncTitle(); syncDesc();
       return;
     }
-    // Update mode
     $("#saveLabel").innerText = "Update Form";
     $("#viewPublicBtn").style.display = "";
     $("#viewPublicBtn").href = `/f/${encodeURIComponent(state.editSlug)}`;
@@ -486,19 +541,16 @@
       if(!data.ok){ alert(data.error || "Failed to load form"); return; }
 
       const form = data.form || {};
-      // Title/desc
       $("#formTitle").value = form.title || "";
       $("#formDesc").value = form.description || "";
       syncTitle(); syncDesc();
 
-      // Theme
       const th = form.theme || null;
       state.theme = th ? {...th} : {...THEMES[0]};
       renderThemes();
       const match = THEMES.find(t => t.key === (state.theme.key || "")) || THEMES[0];
       selectTheme(match);
 
-      // Image
       if(form.form_image_id){
         state.form_image_id = form.form_image_id;
         imgWrap.style.display = "";
@@ -506,7 +558,6 @@
         imgStatusNote.textContent = "Uploaded ✓";
       }
 
-      // Fields
       const fs = Array.isArray(form.fields) ? form.fields : [];
       state.fields = fs.map(f => ({
         id: f.id || uid(),
@@ -514,7 +565,9 @@
         type: f.type || "text",
         required: !!f.required,
         placeholder: f.placeholder || "",
-        format: f.format || ""
+        format: f.format || "",
+        options: Array.isArray(f.options) ? f.options : undefined,
+        default: f.default || undefined
       }));
       renderFields();
     }catch(e){
@@ -523,7 +576,6 @@
     }
   }
 
-  // Lightweight toast
   function toast(msg){
     const b=document.createElement('div');
     b.textContent=msg;
@@ -536,10 +588,8 @@
     setTimeout(()=>b.remove(),1400);
   }
 
-  // init
   renderThemes();
   prefillIfEditing();
-
 })();
 </script>
 </body>
