@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>{{ form.title }}</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
 <link rel="icon" href="https://store-images.s-microsoft.com/image/apps.44537.13628881801009959.f429098c-f6ba-4196-a164-1109adc458e8.5f1e249b-7942-4e1d-aa67-487271e222e5" type="image/x-icon">
 {% if suspended %}
 <meta name="robots" content="noindex,nofollow">
@@ -75,9 +76,15 @@
   .req::after{ content:" *"; color:#dc2626; }
   .form-label{ font-weight:600; }
   .form-text{ color:var(--muted) !important; }
-  .form-control, .form-select{ border:1px solid var(--ring); }
+  .form-control, .form-select{ border:1px solid var(--ring); transition: border-color .15s, box-shadow .15s; }
   .form-control:focus, .form-select:focus{
     border-color: var(--brand); box-shadow: var(--focus);
+  }
+
+  /* Turn green when filled & valid */
+  .filled-ok{
+    border-color: var(--ok) !important;
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--ok) 60%, transparent);
   }
 
   .input-wrap{ position: relative; }
@@ -104,7 +111,7 @@
   .btn-primary:active{ transform: translateY(0); box-shadow:0 6px 18px rgba(14,165,233,.22); }
   .btn[disabled]{ opacity:.65; cursor:not-allowed; }
 
-  /* Overlay (kept for non-suspended flows) */
+  /* Overlay */
   .overlay{ position: fixed; inset: 0; background: rgba(0,0,0,.45); display:none; align-items:center; justify-content:center; z-index: 9999; backdrop-filter: blur(2px); }
   .overlay.show{ display:flex; }
   .overlay-card{ background: var(--card-bg); color: var(--ink); border:1px solid var(--ring); border-radius: 14px; padding: 18px 20px; min-width: 240px; box-shadow: var(--shadow); text-align:center; }
@@ -162,7 +169,6 @@
     <div class="cardx mt-3">
       <div class="s-banner mb-3 d-flex align-items-center gap-3 flex-wrap">
         <span class="s-icon">
-          <!-- pause icon -->
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor">
             <rect x="6" y="4" width="4" height="16" rx="1.5"></rect>
             <rect x="14" y="4" width="4" height="16" rx="1.5"></rect>
@@ -207,12 +213,31 @@
           {% set ac = 'name' if 'name' in (f.id|string) else ('email' if f.type=='email' else ('tel' if f.type=='tel' else 'on')) %}
           {% set inputmode = 'numeric' if f.type=='number' else ('tel' if f.type=='tel' else ('email' if f.type=='email' else 'text')) %}
 
-          {% if f.type in ['text','email','tel','date','number'] %}
+          {# ===== SELECT (Dropdown) ===== #}
+          {% if f.type == 'select' %}
+            <div>
+              <label class="form-label {{ reqclass }}" for="{{ f.id }}">{{ f.label }}</label>
+              <select
+                class="form-select"
+                id="{{ f.id }}"
+                name="{{ f.id }}"
+                {{ req }}
+                autocomplete="on"
+              >
+                <option value=""></option>
+                {% for opt in f.options %}
+                  <option value="{{ opt }}" {% if f.default and f.default == opt %}selected{% endif %}>{{ opt }}</option>
+                {% endfor %}
+              </select>
+              <div class="err-note">Please choose an option.</div>
+            </div>
+
+          {# ===== INPUTS (text/email/tel/date/number) ===== #}
+          {% elif f.type in ['text','email','tel','date','number'] %}
             <div>
               <label class="form-label {{ reqclass }}" for="{{ f.id }}">{{ f.label }}</label>
               <div class="input-wrap">
                 <span class="leading">
-                  <!-- simple generic leading icon -->
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M7 8h10M7 12h6M7 16h8" stroke-linecap="round"/></svg>
                 </span>
                 <input
@@ -231,6 +256,7 @@
               <div class="err-note">Please enter a valid value.</div>
             </div>
 
+          {# ===== TEXTAREA ===== #}
           {% elif f.type == 'textarea' %}
             <div>
               <label class="form-label {{ reqclass }}" for="{{ f.id }}">{{ f.label }}</label>
@@ -238,6 +264,7 @@
               <div class="err-note">This field is required.</div>
             </div>
 
+          {# ===== Fallback (shouldn't hit) ===== #}
           {% else %}
             <div>
               <label class="form-label {{ reqclass }}" for="{{ f.id }}">{{ f.label }}</label>
@@ -271,7 +298,7 @@
 
 {% if not suspended %}
 <script>
-  // ==== Draft autosave + validation (only when active) ====
+  // ==== Draft autosave + validation + green-when-filled (only when active) ====
   (function(){
     const form = document.querySelector('form');
     if(!form) return;
@@ -281,6 +308,7 @@
 
     const STORAGE_KEY = `formdraft:{{ form.slug }}`;
 
+    /* ---------- Draft Save / Load ---------- */
     let saveTimer = null;
     function scheduleSave(){
       if(saveTimer) clearTimeout(saveTimer);
@@ -322,35 +350,79 @@
         if(parsed && parsed.v) applyValues(parsed.v);
       }catch(e){}
     }
-
-    loadDraft();
-    form.addEventListener('input', scheduleSave, true);
-    form.addEventListener('change', scheduleSave, true);
-
     function clearDraft(){ try{ localStorage.removeItem(STORAGE_KEY); }catch(e){} }
 
-    resetBtn?.addEventListener('click', ()=> setTimeout(clearDraft, 0));
+    loadDraft();
 
+    /* ---------- Validation helpers ---------- */
     function setInvalid(input, invalid){
       if(invalid) input.classList.add('is-invalid');
       else input.classList.remove('is-invalid');
     }
+
+    // Turn green only when non-empty AND passes browser validity (type, pattern, required)
+    function updateFilledState(el){
+      const hasValue = (el.tagName === 'SELECT') ? (el.value !== '') : (el.value.trim() !== '');
+      const isValid = el.checkValidity(); // built-in validation (required, type, pattern)
+      if(hasValue && isValid){
+        el.classList.add('filled-ok');
+        setInvalid(el, false);
+      }else{
+        el.classList.remove('filled-ok');
+        // only show error if user tried to submit (handled in submit) or field explicitly invalid
+      }
+    }
+
+    // Quick validate all fields; uses built-in validity first, then pattern fallback if needed
     function quickValidate(){
       let bad = false;
       form.querySelectorAll('input, textarea, select').forEach(el=>{
-        if(el.hasAttribute('required') && !el.value.trim()){ setInvalid(el, true); bad = true; return; }
-        const pat = el.getAttribute('pattern');
-        if(pat){
-          try{
-            const re = new RegExp(pat);
-            if(el.value && !re.test(el.value)){ setInvalid(el, true); bad = true; }
-            else setInvalid(el, false);
-          }catch(_){ setInvalid(el, false); }
-        } else setInvalid(el, false);
+        // built-in validity handles required/type/pattern
+        const valid = el.checkValidity();
+        if(!valid){
+          setInvalid(el, true);
+          bad = true;
+        }else{
+          setInvalid(el, false);
+        }
+        updateFilledState(el);
       });
       return !bad;
     }
 
+    // Bind listeners
+    form.addEventListener('input', (e)=>{
+      const el = e.target;
+      if(!(el instanceof HTMLElement)) return;
+      if(!['INPUT','TEXTAREA','SELECT'].includes(el.tagName)) return;
+      updateFilledState(el);
+      scheduleSave();
+    }, true);
+
+    form.addEventListener('change', (e)=>{
+      const el = e.target;
+      if(!(el instanceof HTMLElement)) return;
+      if(!['INPUT','TEXTAREA','SELECT'].includes(el.tagName)) return;
+      updateFilledState(el);
+      scheduleSave();
+    }, true);
+
+    // After loading draft, mark initial states
+    requestAnimationFrame(()=>{
+      form.querySelectorAll('input, textarea, select').forEach(updateFilledState);
+    });
+
+    // Reset clears draft + visuals
+    resetBtn?.addEventListener('click', ()=>{
+      setTimeout(()=>{
+        clearDraft();
+        form.querySelectorAll('.is-invalid,.filled-ok').forEach(el=>{
+          el.classList.remove('is-invalid','filled-ok');
+        });
+      }, 0);
+    });
+
+    /* ---------- Submit flow ---------- */
     function showOverlay(){ overlay.classList.add('show'); overlay.setAttribute('aria-hidden','false'); }
     function hideOverlay(){ overlay.classList.remove('show'); overlay.setAttribute('aria-hidden','true'); }
 
@@ -358,8 +430,12 @@
     window.addEventListener('pagehide', ()=>{ if(submitting){ clearDraft(); } });
 
     form.addEventListener('submit', (e)=>{
+      // Validate everything once more
       if(!quickValidate()){
         e.preventDefault();
+        // Focus first invalid field
+        const badEl = form.querySelector('.is-invalid');
+        if(badEl && badEl.focus) badEl.focus();
         return;
       }
       saveDraft();
@@ -370,6 +446,8 @@
       `;
       showOverlay();
       submitting = true;
+
+      // Safety: hide after 10s if still on page (server should render next page quickly)
       setTimeout(()=>{ if(!document.hidden) hideOverlay(); }, 10000);
     }, false);
   })();
