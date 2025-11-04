@@ -9,10 +9,15 @@
 
 <style>
   :root{
-    --ink:#0b1320; --muted:#64748b; --ring:#e9ecef; --soft:#f6f8fb; --brand:#0ea5e9; --ok:#16a34a; --bad:#dc2626; --surface:#fff;
+    --ink:#0b1320; --muted:#64748b; --ring:#cdd6e3; --ring-2:#b9c6d9;
+    --soft:#f6f8fb; --brand:#0ea5e9; --brand-700:#0284c7; --ok:#16a34a; --bad:#dc2626; --surface:#ffffff;
+    --header-fg:#ffffff; --header-bg:#0ea5e9; --header-bg-2:#0b90d0;
   }
   @media (prefers-color-scheme: dark){
-    :root{ --ink:#e6e7e9; --muted:#a3aab4; --ring:#2b3038; --soft:#0f141a; --surface:#0f1319; }
+    :root{
+      --ink:#e6e7e9; --muted:#a3aab4; --ring:#2a313b; --ring-2:#36404d;
+      --soft:#0f141a; --surface:#0f1319; --header-fg:#eaf6ff; --header-bg:#0b4d66; --header-bg-2:#0a3f54;
+    }
   }
   body{ background:var(--soft); color:var(--ink); font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
 
@@ -27,11 +32,49 @@
   @media (min-width: 992px){ .page{ margin-top:32px; } }
 
   .cardx{ border-radius:14px; border:1px solid var(--ring); background:var(--surface); box-shadow:0 12px 30px rgba(2,6,23,.06); }
-  .table thead th{ background:#f1f5f9; position: sticky; top:0; z-index: 5; }
-  @media (prefers-color-scheme: dark){ .table thead th{ background:#10151c; } }
-  .table tbody tr{ transition: background .12s ease; }
-  .table tbody tr:hover{ background: rgba(14,165,233,.06); }
-  .table td, .table th{ border-color:var(--ring); }
+
+  /* ===== Excel-like table ===== */
+  .excel-wrap{ border-top-left-radius: 14px; border-top-right-radius: 14px; overflow: hidden; }
+  .excel-table{
+    border-collapse: separate; /* keeps sticky header shadows clean */
+    border-spacing: 0;
+    width: 100%;
+    background: var(--surface);
+  }
+  .excel-table thead th{
+    position: sticky; top: 0; z-index: 5;
+    color: var(--header-fg);
+    background: linear-gradient(180deg, var(--header-bg), var(--header-bg-2));
+    font-weight: 700;
+    border-top: 1px solid var(--ring-2);
+    border-bottom: 2px solid var(--ring-2);
+    text-transform: none;
+    vertical-align: middle;
+    white-space: nowrap;
+    padding: .75rem .75rem;
+    box-shadow: 0 2px 0 rgba(0,0,0,.04);
+  }
+  .excel-table tbody td, .excel-table thead th, .excel-table tfoot td{
+    border-left: 1px solid var(--ring);
+    border-right: 1px solid var(--ring);
+  }
+  .excel-table tbody td{
+    border-bottom: 1px solid var(--ring);
+    vertical-align: top;
+    padding: .6rem .65rem;
+    background: var(--surface);
+  }
+  /* outer border */
+  .excel-table{
+    border: 1px solid var(--ring-2);
+  }
+  /* zebra */
+  .excel-table tbody tr:nth-child(odd) td{ background: color-mix(in srgb, var(--soft) 45%, transparent); }
+  .excel-table tbody tr:hover td{ background: color-mix(in srgb, var(--brand) 12%, var(--surface)); transition: background .12s ease; }
+
+  /* action column */
+  .col-actions{ width:1%; white-space: nowrap; }
+
   .badge-code{ font-family: ui-monospace, Menlo, Consolas, monospace; }
 
   .share-input{ max-width:520px; }
@@ -55,6 +98,14 @@
 
   /* Offcanvas width */
   @media (min-width: 992px){ .offcanvas-end.wide{ width: 520px; } }
+
+  /* Print-friendly gridlines */
+  @media print{
+    .navbar, .offcanvas, .btn, .pagination, .modal{ display:none !important; }
+    .excel-table thead th{ -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .excel-table, .excel-table th, .excel-table td{ border:1px solid #000 !important; }
+    body{ background:#fff; }
+  }
 </style>
 </head>
 <body>
@@ -136,16 +187,21 @@
   </div>
 
   <!-- Submissions table -->
-  <div class="cardx p-0">
+  <div class="cardx p-0 excel-wrap">
     <div class="table-responsive">
-      <table class="table align-middle m-0">
+      <table class="excel-table table-sm align-middle m-0">
+        <colgroup>
+          <col style="width: 180px;">
+          {% for col in columns %}<col>{% endfor %}
+          <col style="width: 1%;">
+        </colgroup>
         <thead>
           <tr>
-            <th style="width:170px;">Submitted At</th>
+            <th>Submitted At</th>
             {% for col in columns %}
               <th>{{ col.label }}</th>
             {% endfor %}
-            <th class="text-end" style="width:1%;">Actions</th>
+            <th class="text-end">Actions</th>
           </tr>
         </thead>
         <tbody id="rows">
@@ -155,10 +211,10 @@
               {% for col in columns %}
                 <td data-key="{{ col.id }}">{{ s.fields.get(col.id, '') }}</td>
               {% endfor %}
-              <td class="text-end">
+              <td class="text-end col-actions">
                 <div class="btn-group btn-group-sm">
                   <button class="btn btn-outline-primary" data-act="edit"><i class="bi bi-pencil-square"></i> Edit</button>
-                  <button class="btn btn-outline-danger" data-act="del"><i class="bi bi-trash"></i></button>
+                  <button class="btn btn-outline-danger" data-act="del" title="Delete"><i class="bi bi-trash"></i></button>
                 </div>
               </td>
             </tr>
@@ -166,22 +222,27 @@
             <tr><td colspan="{{ 2 + (columns|length) }}" class="text-center text-muted py-5">No submissions yet.</td></tr>
           {% endfor %}
         </tbody>
+        {% if pages > 1 %}
+        <tfoot>
+          <tr>
+            <td colspan="{{ 2 + (columns|length) }}">
+              <div class="p-3 d-flex justify-content-between align-items-center">
+                <div class="text-muted">Showing page {{ page }} of {{ pages }} ({{ total }} total)</div>
+                <div class="d-flex gap-2">
+                  {% if page > 1 %}
+                    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_bp.view_form', slug=form.slug, q=q, per_page=per_page, page=page-1) }}">&laquo; Prev</a>
+                  {% endif %}
+                  {% if page < pages %}
+                    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_bp.view_form', slug=form.slug, q=q, per_page=per_page, page=page+1) }}">Next &raquo;</a>
+                  {% endif %}
+                </div>
+              </div>
+            </td>
+          </tr>
+        </tfoot>
+        {% endif %}
       </table>
     </div>
-
-    {% if pages > 1 %}
-    <div class="p-3 d-flex justify-content-between align-items-center">
-      <div class="text-muted">Showing page {{ page }} of {{ pages }} ({{ total }} total)</div>
-      <div class="d-flex gap-2">
-        {% if page > 1 %}
-          <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_bp.view_form', slug=form.slug, q=q, per_page=per_page, page=page-1) }}">&laquo; Prev</a>
-        {% endif %}
-        {% if page < pages %}
-          <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_bp.view_form', slug=form.slug, q=q, per_page=per_page, page=page+1) }}">Next &raquo;</a>
-        {% endif %}
-      </div>
-    </div>
-    {% endif %}
   </div>
 </div>
 
