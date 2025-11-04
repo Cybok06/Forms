@@ -176,14 +176,14 @@
 
                   <!-- Slide-out tray -->
                   <span id="actions-{{ f._id }}" class="row-actions">
-                    <!-- Edit: go to /builder/<slug> (prefill works) -->
+                    <!-- Edit: /builder/<slug> (prefill works) -->
                     <a class="btn btn-sm btn-outline-secondary"
                        href="{{ url_for('form_bp.builder_edit', slug=f.slug) }}"
                        title="Edit form">
                       <i class="bi bi-pencil-square"></i> <span class="d-none d-lg-inline">Edit</span>
                     </a>
 
-                    <!-- Submissions tab -->
+                    <!-- Submissions -->
                     <a class="btn btn-sm btn-outline-secondary"
                        href="{{ url_for('admin_bp.view_form', slug=f.slug) }}?tab=submissions#submissions"
                        title="View submissions">
@@ -218,6 +218,16 @@
                       {% else %}
                         <i class="bi bi-pause-circle"></i> <span class="d-none d-lg-inline">Suspend</span>
                       {% endif %}
+                    </button>
+
+                    <!-- DELETE FORM (and its submissions) -->
+                    <button class="btn btn-sm btn-outline-danger"
+                            type="button"
+                            title="Delete form"
+                            data-action="delete-form"
+                            data-slug="{{ f.slug }}"
+                            data-endpoint="{{ url_for('admin_bp.delete_form', slug=f.slug) }}">
+                      <i class="bi bi-trash"></i> <span class="d-none d-lg-inline">Delete</span>
                     </button>
                   </span>
                 </div>
@@ -363,6 +373,52 @@
       toast('Failed. Try again.');
     }
   });
+
+  // DELETE form (and its submissions) via DELETE /admin/forms/<slug>
+  document.addEventListener('click', async (e)=>{
+    const btn = e.target.closest('button[data-action="delete-form"]');
+    if(!btn) return;
+
+    const endpoint = btn.getAttribute('data-endpoint');
+    const slug = btn.getAttribute('data-slug');
+
+    const confirmMsg = `Delete this form permanently? All its submissions will be removed.`;
+    if(!confirm(confirmMsg)) return;
+
+    setBusy(btn, true);
+
+    try{
+      const res = await fetch(endpoint, {
+        method:'DELETE',
+        headers:{ 'X-Requested-With':'fetch' }
+      });
+      const data = await res.json().catch(()=>({}));
+      if(!res.ok || data.ok===false){ throw new Error(data.error || 'Delete failed'); }
+
+      // Remove the row
+      const tr = btn.closest('tr');
+      tr?.parentElement?.removeChild(tr);
+      toast('Form deleted.');
+    }catch(err){
+      console.error(err);
+      toast(err.message || 'Delete failed.');
+    }finally{
+      setBusy(btn, false);
+    }
+  });
+
+  function setBusy(btn, on){
+    if(on){
+      btn.setAttribute('disabled','true');
+      btn.setAttribute('aria-disabled','true');
+      btn.dataset._oldHtml = btn.innerHTML;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Deleting…';
+    }else{
+      btn.removeAttribute('disabled');
+      btn.removeAttribute('aria-disabled');
+      if(btn.dataset._oldHtml) btn.innerHTML = btn.dataset._oldHtml;
+    }
+  }
 
   // Share modal logic
   let shareModal, shareUrlInput, shareFormTitle, waShareBtn;
