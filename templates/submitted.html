@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>{{ form.title or 'This form' }} • Submitted</title>
+<link rel="icon" href="https://store-images.s-microsoft.com/image/apps.44537.13628881801009959.f429098c-f6ba-4196-a164-1109adc458e8.5f1e249b-7942-4e1d-aa67-487271e222e5" type="image/x-icon">
+
+
+<style>
+  /* ==== Design tokens ====================================================== */
+  :root{
+    --ink:#0b1320; --muted:#64748b; --ring:#e5e7eb; --soft:#f6f8fb;
+    --brand:#0ea5e9; --ok:#16a34a;
+    --card-radius:18px; --btn-radius:12px;
+    --shadow: 0 12px 36px rgba(2,6,23,.10);
+    --focus: 0 0 0 2px rgba(14,165,233,.28), 0 0 0 4px rgba(14,165,233,.18);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --ink:#e6e7e9; --muted:#9aa3af; --ring:#2a2f36; --soft:#0e1116;
+      --shadow: 0 16px 40px rgba(0,0,0,.35);
+    }
+  }
+
+  /* ==== Page =============================================================== */
+  html, body { height:100%; }
+  body{
+    margin:0; color:var(--ink); background:var(--soft);
+    display:flex; align-items:center; justify-content:center;
+    -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+    font: 16px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  }
+
+  /* ==== Card (slides in from left) ======================================== */
+  .card{
+    position:relative; width:100%; max-width:640px;
+    border:1px solid var(--ring); border-radius:var(--card-radius);
+    background:#fff; box-shadow:var(--shadow); padding:28px;
+    transform: translateX(-18px); opacity:0;
+    animation: cardIn 420ms cubic-bezier(.2,.65,.3,1) forwards;
+  }
+  @media (prefers-color-scheme: dark){
+    .card{ background:#0f1319; }
+  }
+  @keyframes cardIn { to{ transform:translateX(0); opacity:1; } }
+
+  /* Accent hairline with subtle shimmer */
+  .accent {
+    position:absolute; inset:0 0 auto 0; height:3px; border-radius:var(--card-radius) var(--card-radius) 0 0;
+    background: linear-gradient(90deg, var(--brand), var(--ok));
+    mask: linear-gradient(90deg, rgba(0,0,0,.0), rgba(0,0,0,1) 10%, rgba(0,0,0,1) 90%, rgba(0,0,0,.0));
+    -webkit-mask: linear-gradient(90deg, rgba(0,0,0,.0), rgba(0,0,0,1) 10%, rgba(0,0,0,1) 90%, rgba(0,0,0,.0));
+    overflow:hidden;
+  }
+  .accent::after{
+    content:""; position:absolute; inset:0; background:
+      linear-gradient(90deg, rgba(255,255,255,.0) 0%, rgba(255,255,255,.5) 50%, rgba(255,255,255,.0) 100%);
+    animation: shimmer 6s linear infinite;
+    mix-blend-mode: overlay; opacity:.25;
+  }
+  @keyframes shimmer { from{ transform:translateX(-100%);} to{ transform:translateX(100%);} }
+
+  /* ==== Header ============================================================== */
+  .head{ display:flex; gap:16px; align-items:center; margin-bottom:10px; }
+
+  /* Celebrating icon: gradient badge with check + subtle burst */
+  .badge{
+    width:56px; height:56px; border-radius:16px; display:grid; place-items:center;
+    background: radial-gradient(60% 60% at 30% 30%, rgba(14,165,233,.18), transparent 60%),
+                radial-gradient(70% 70% at 70% 70%, rgba(22,163,74,.16), transparent 60%),
+                #ffffff10;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.35);
+    position:relative; overflow:visible;
+  }
+  /* checkmark */
+  .badge svg.check{ width:30px; height:30px; color:var(--ok);
+    transform:scale(.95); opacity:0; filter: drop-shadow(0 0 4px rgba(22,163,74,.35));
+    animation: iconPop 140ms ease-out 220ms forwards;
+  }
+  @keyframes iconPop { to{ transform:scale(1); opacity:1; } }
+
+  /* tiny celebratory burst confetti */
+  .burst{ position:absolute; inset:auto; pointer-events:none; }
+  .b1,.b2,.b3{ position:absolute; width:6px; height:6px; border-radius:2px; opacity:0; }
+  .b1{ background:#0ea5e9; top:-8px; left:6px; animation: pop1 520ms ease-out 180ms forwards; }
+  .b2{ background:#16a34a; top:2px; right:-8px; animation: pop2 520ms ease-out 220ms forwards; }
+  .b3{ background:#22c55e; bottom:-8px; left:18px; animation: pop3 520ms ease-out 240ms forwards; }
+  @keyframes pop1 { to{ transform: translate(-4px,-6px) rotate(18deg); opacity:1; } }
+  @keyframes pop2 { to{ transform: translate(6px,-4px) rotate(-22deg); opacity:1; } }
+  @keyframes pop3 { to{ transform: translate(-2px,6px) rotate(14deg); opacity:1; } }
+
+  h1{
+    margin:0; font-weight:600; letter-spacing:.2px;
+    font-size: clamp(20px, 2.2vw, 24px); line-height:1.25;
+  }
+
+  /* ==== Subtext line ======================================================= */
+  .subtext{
+    display:flex; align-items:center; gap:10px; color:var(--muted); margin:8px 0 18px;
+    font-size: clamp(14px, 1.7vw, 16px);
+  }
+  .subtext .doc{ width:18px; height:18px; flex:0 0 18px; color:var(--muted); }
+
+  /* ==== Primary Action ===================================================== */
+  .actions{ display:flex; gap:10px; flex-wrap:wrap; }
+  .btn{
+    --padY:12px; --padX:16px;
+    display:inline-flex; align-items:center; gap:10px; justify-content:center;
+    min-height:44px; padding: var(--padY) var(--padX);
+    border-radius: var(--btn-radius); border:1px solid var(--ring);
+    font-weight:500; text-decoration:none; cursor:pointer; user-select:none;
+    transition: transform .12s ease, box-shadow .12s ease, background .12s ease, opacity .12s ease;
+    outline: none;
+  }
+  .btn svg{ width:18px; height:18px; }
+
+  .btn-primary{
+    color:#fff; background: linear-gradient(90deg, var(--brand), var(--ok)); border: none;
+    box-shadow: 0 6px 18px rgba(14,165,233,.25);
+  }
+  .btn-primary:hover{ transform: translateY(-1px); box-shadow:0 10px 24px rgba(14,165,233,.30); }
+  .btn-primary:active{ transform: translateY(0); box-shadow:0 6px 18px rgba(14,165,233,.22); }
+  .btn-primary:focus-visible{ box-shadow: var(--focus); }
+
+  /* ==== Reduce motion ====================================================== */
+  @media (prefers-reduced-motion: reduce){
+    .card, .badge svg.check, .b1,.b2,.b3, .accent::after { animation:none !important; }
+    .btn{ transition:none !important; }
+  }
+</style>
+</head>
+<body>
+
+  <main class="card" role="region" aria-labelledby="submitted-title">
+    <div class="accent" aria-hidden="true"></div>
+
+    <header class="head">
+      <!-- Celebrating icon: gradient badge + check + tiny confetti -->
+      <div class="badge" aria-hidden="true">
+        <svg class="check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9">
+          <path d="M12 3l7 3v6c0 5-3.5 8.5-7 9-3.5-.5-7-4-7-9V6l7-3z"/>
+          <path d="M9 12l2 2 4-4" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span class="burst b1"></span><span class="burst b2"></span><span class="burst b3"></span>
+      </div>
+      <h1 id="submitted-title" role="status" aria-live="polite">Thanks! Your response was submitted.</h1>
+    </header>
+
+    <p class="subtext">
+      <!-- doc.text icon -->
+      <svg class="doc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+        <path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z"/>
+        <path d="M14 2v5h5"/>
+        <path d="M9 13h6M9 17h6M9 9h3" stroke-linecap="round"/>
+      </svg>
+      <span>Form: <strong>{{ form.title or 'This form' }}</strong></span>
+    </p>
+
+    <nav class="actions" aria-label="Actions">
+      <!-- Primary: Submit again -->
+      <a class="btn btn-primary"
+         href="{{ url_for('form_bp.render_form', slug=form.slug) }}"
+         aria-label="Submit another response">
+        <!-- arrow.counterclockwise -->
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path d="M3 12a9 9 0 1 0 3-6.708" stroke-linecap="round"/>
+          <path d="M3 4v5h5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>Submit another response</span>
+      </a>
+    </nav>
+  </main>
+
+</body>
+</html>

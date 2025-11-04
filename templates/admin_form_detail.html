@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Form • {{ form.title }}</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+<link rel="icon" href="https://store-images.s-microsoft.com/image/apps.44537.13628881801009959.f429098c-f6ba-4196-a164-1109adc458e8.5f1e249b-7942-4e1d-aa67-487271e222e5" type="image/x-icon">
+
+<style>
+  :root{
+    --ink:#0b1320; --muted:#64748b; --ring:#e9ecef; --soft:#f6f8fb; --brand:#0ea5e9; --ok:#16a34a; --bad:#dc2626; --surface:#fff;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --ink:#e6e7e9; --muted:#a3aab4; --ring:#2b3038; --soft:#0f141a; --surface:#0f1319; }
+  }
+  body{ background:var(--soft); color:var(--ink); font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+
+  /* Navbar */
+  .navbar-custom{ background: var(--surface); border-bottom:1px solid var(--ring); }
+  .navbar .nav-link{ color: var(--ink); }
+  .navbar .nav-link.active{ font-weight:600; }
+  .navbar .btn-outline-secondary{ border-color: var(--ring); }
+
+  /* Layout */
+  .page{ max-width:1200px; margin:24px auto; padding-top: 12px; }
+  @media (min-width: 992px){ .page{ margin-top:32px; } }
+
+  .cardx{ border-radius:14px; border:1px solid var(--ring); background:var(--surface); box-shadow:0 12px 30px rgba(2,6,23,.06); }
+  .table thead th{ background:#f1f5f9; position: sticky; top:0; z-index: 5; }
+  @media (prefers-color-scheme: dark){ .table thead th{ background:#10151c; } }
+  .table tbody tr{ transition: background .12s ease; }
+  .table tbody tr:hover{ background: rgba(14,165,233,.06); }
+  .table td, .table th{ border-color:var(--ring); }
+  .badge-code{ font-family: ui-monospace, Menlo, Consolas, monospace; }
+
+  .share-input{ max-width:520px; }
+  .search-bar .form-control{ height: 44px; }
+
+  /* KPI */
+  .kpi{ border:1px solid var(--ring); border-radius:14px; background:var(--surface); padding:16px; }
+  .kpi .label{ color:var(--muted); font-size:.85rem; }
+  .kpi .value{ font-weight:700; font-size:1.6rem; color:var(--brand); line-height:1; }
+
+  /* Toast */
+  #toast{
+    position: fixed; right: 16px; bottom: 16px; z-index: 9999;
+    background: var(--surface); color: var(--ink); border:1px solid var(--ring);
+    border-radius: 10px; padding:10px 12px; box-shadow:0 8px 22px rgba(2,6,23,.15); display:none;
+  }
+
+  .btn-ghost{ border:1px solid var(--ring); background:var(--surface); }
+  .btn-ghost:hover{ background:#eef6ff; }
+  @media (prefers-color-scheme: dark){ .btn-ghost:hover{ background:#111a24; } }
+
+  /* Offcanvas width */
+  @media (min-width: 992px){ .offcanvas-end.wide{ width: 520px; } }
+</style>
+</head>
+<body>
+
+<!-- Responsive Navbar -->
+<nav class="navbar navbar-expand-lg navbar-custom sticky-top">
+  <div class="container">
+    <a class="navbar-brand d-flex align-items-center gap-2" href="{{ url_for('admin_bp.dashboard') }}" style="color:var(--ink);">
+      <span class="d-inline-block" style="width:10px;height:10px;border-radius:50%;background:var(--brand)"></span>
+      <strong>Admin</strong>
+    </a>
+
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav"
+            aria-controls="mainNav" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div id="mainNav" class="collapse navbar-collapse">
+      <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+        <li class="nav-item">
+          <a class="nav-link {% if active_page=='dashboard' %}active{% endif %}" href="{{ url_for('admin_bp.dashboard') }}">
+            <i class="bi bi-speedometer2"></i> Dashboard
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if active_page=='create_form' %}active{% endif %}" href="{{ url_for('form_bp.builder') }}">
+            <i class="bi bi-plus-square"></i> Create Form
+          </a>
+        </li>
+      </ul>
+
+      <div class="d-flex align-items-center gap-2">
+        <!-- Toggle Filters/Share offcanvas -->
+        <button class="btn btn-outline-secondary" type="button" data-bs-toggle="offcanvas"
+                data-bs-target="#filtersPanel" aria-controls="filtersPanel" title="Filters & Share">
+          <i class="bi bi-search"></i>
+        </button>
+
+        <!-- Open live form -->
+        <a class="btn btn-ghost d-none d-sm-inline-flex" href="{{ url_for('form_bp.render_form', slug=form.slug) }}" target="_blank">
+          <i class="bi bi-box-arrow-up-right"></i> Open Live Form
+        </a>
+
+        <!-- Export -->
+        <div class="btn-group">
+          <a class="btn btn-primary" href="{{ url_for('admin_bp.export_form', slug=form.slug, fmt='xlsx') }}">
+            <i class="bi bi-file-earmark-spreadsheet"></i> Excel
+          </a>
+          <a class="btn btn-outline-primary" href="{{ url_for('admin_bp.export_form', slug=form.slug, fmt='pdf') }}">
+            <i class="bi bi-filetype-pdf"></i> PDF
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<div class="page container">
+  <!-- Header line under navbar -->
+  <div class="d-flex align-items-center flex-wrap gap-2 mb-3">
+    <a href="{{ url_for('admin_bp.dashboard') }}" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-arrow-left"></i> Back
+    </a>
+    <h1 class="h4 m-0">{{ form.title }}</h1>
+    <span class="badge rounded-pill text-bg-light badge-code">{{ form.slug }}</span>
+  </div>
+
+  <!-- KPI row -->
+  <div class="row g-3 mb-3">
+    <div class="col-6 col-md-3">
+      <div class="kpi">
+        <div class="d-flex justify-content-between align-items-center">
+          <span class="label">Total submissions</span>
+          <i class="bi bi-bar-chart"></i>
+        </div>
+        <div class="value">{{ total }}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Submissions table -->
+  <div class="cardx p-0">
+    <div class="table-responsive">
+      <table class="table align-middle m-0">
+        <thead>
+          <tr>
+            <th style="width:170px;">Submitted At</th>
+            {% for col in columns %}
+              <th>{{ col.label }}</th>
+            {% endfor %}
+            <th class="text-end" style="width:1%;">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="rows">
+          {% for s in submissions %}
+            <tr data-id="{{ s._id }}">
+              <td class="text-nowrap">{{ s.created_at_str }}</td>
+              {% for col in columns %}
+                <td data-key="{{ col.id }}">{{ s.fields.get(col.id, '') }}</td>
+              {% endfor %}
+              <td class="text-end">
+                <div class="btn-group btn-group-sm">
+                  <button class="btn btn-outline-primary" data-act="edit"><i class="bi bi-pencil-square"></i> Edit</button>
+                  <button class="btn btn-outline-danger" data-act="del"><i class="bi bi-trash"></i></button>
+                </div>
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="{{ 2 + (columns|length) }}" class="text-center text-muted py-5">No submissions yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if pages > 1 %}
+    <div class="p-3 d-flex justify-content-between align-items-center">
+      <div class="text-muted">Showing page {{ page }} of {{ pages }} ({{ total }} total)</div>
+      <div class="d-flex gap-2">
+        {% if page > 1 %}
+          <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_bp.view_form', slug=form.slug, q=q, per_page=per_page, page=page-1) }}">&laquo; Prev</a>
+        {% endif %}
+        {% if page < pages %}
+          <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_bp.view_form', slug=form.slug, q=q, per_page=per_page, page=page+1) }}">Next &raquo;</a>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Offcanvas: Filters + Share -->
+<div class="offcanvas offcanvas-end wide" tabindex="-1" id="filtersPanel" aria-labelledby="filtersTitle">
+  <div class="offcanvas-header">
+    <h5 class="offcanvas-title" id="filtersTitle"><i class="bi bi-search"></i> Filters & Share</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+  </div>
+  <div class="offcanvas-body">
+    <!-- Share link -->
+    <div class="cardx p-3 mb-3">
+      <label class="form-label">Share link</label>
+      <div class="d-flex flex-wrap gap-2">
+        <input id="shareLink" class="form-control share-input" readonly value="{{ share_url }}">
+        <button id="copyBtn" class="btn btn-outline-secondary" type="button"><i class="bi bi-clipboard"></i> Copy</button>
+        <a class="btn btn-outline-primary" target="_blank" href="{{ share_url }}"><i class="bi bi-box-arrow-up-right"></i> Open</a>
+      </div>
+      <div id="copyNote" class="form-text text-success" style="display:none;">Link copied ✓</div>
+    </div>
+
+    <!-- Search / Filters -->
+    <div class="cardx p-3">
+      <form class="row g-2 align-items-end search-bar" method="get" action="{{ url_for('admin_bp.view_form', slug=form.slug) }}">
+        <div class="col-12">
+          <label class="form-label small text-muted">Search in submissions</label>
+          <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-search"></i></span>
+            <input type="text" class="form-control" name="q" placeholder="Type name, email, phone, etc…" value="{{ q or '' }}">
+          </div>
+        </div>
+        <div class="col-6">
+          <label class="form-label small text-muted">Per page</label>
+          <select class="form-select" name="per_page">
+            {% for n in [20,50,100,200] %}
+              <option value="{{n}}" {% if per_page==n %}selected{% endif %}>Show {{n}}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <!-- Actions: Search + Reset -->
+        <div class="col-6 d-grid">
+          <label class="form-label small text-muted">&nbsp;</label>
+          <div class="d-flex gap-2">
+            <button class="btn btn-primary flex-fill" type="submit"><i class="bi bi-funnel"></i> Search</button>
+            <button class="btn btn-outline-secondary" type="button" id="resetFilters">
+              <i class="bi bi-arrow-counterclockwise"></i> Reset
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+
+  </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="editTitle" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <form class="modal-content" id="editForm">
+      <div class="modal-header">
+        <h5 class="modal-title" id="editTitle"><i class="bi bi-pencil-square"></i> Edit submission</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="editFields" class="row g-3">
+          <!-- dynamic fields -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-primary" type="submit"><i class="bi bi-check2-circle"></i> Save changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<!-- Boot data as JSON (prevents JS linters from choking on Jinja) -->
+<script id="boot" type="application/json">
+  {{ {'slug': form.slug, 'columns': columns}|tojson }}
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+// ===== Boot data =====
+const BOOT = JSON.parse(document.getElementById('boot').textContent);
+const SLUG = BOOT.slug;
+const COLUMNS = BOOT.columns; // [{id,label}...]
+
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.display = 'block';
+  setTimeout(()=> { t.style.display = 'none'; }, 1400);
+}
+
+// Copy share link
+const copyBtn = document.getElementById('copyBtn');
+if(copyBtn){
+  copyBtn.addEventListener('click', async ()=>{
+    const inp = document.getElementById('shareLink');
+    try{ await navigator.clipboard.writeText(inp.value); }catch(e){
+      inp.select(); document.execCommand('copy');
+    }
+    const note = document.getElementById('copyNote');
+    if(note){ note.style.display=''; setTimeout(()=> note.style.display='none', 1600); }
+  });
+}
+
+// Reset filters button — clears query params and reloads base URL
+const resetBtn = document.getElementById('resetFilters');
+if(resetBtn){
+  resetBtn.addEventListener('click', ()=>{
+    window.location.href = "{{ url_for('admin_bp.view_form', slug=form.slug) }}";
+  });
+}
+
+/* ===== Row actions (edit/delete) ===== */
+const tbody = document.getElementById('rows');
+const editModal = new bootstrap.Modal(document.getElementById('editModal'), {backdrop:'static'});
+let editingId = null;
+
+tbody.addEventListener('click', (ev)=>{
+  const btn = ev.target.closest('button[data-act]');
+  if(!btn) return;
+  const tr = ev.target.closest('tr[data-id]');
+  const id = tr?.dataset?.id;
+  if(!id) return;
+
+  if(btn.dataset.act === 'del'){
+    if(confirm('Delete this submission? This cannot be undone.')){
+      fetch(`/admin/forms/${encodeURIComponent(SLUG)}/submissions/${encodeURIComponent(id)}`, { method:'DELETE' })
+        .then(r=>r.json()).then(j=>{
+          if(j.ok){
+            tr.remove();
+            showToast('Deleted');
+          }else{
+            alert(j.error||'Delete failed');
+          }
+        }).catch(e=>{ console.error(e); alert('Network error'); });
+    }
+    return;
+  }
+
+  if(btn.dataset.act === 'edit'){
+    editingId = id;
+    // Build dynamic form from current row values
+    const wrap = document.getElementById('editFields');
+    wrap.innerHTML = '';
+    COLUMNS.forEach(col=>{
+      const td = tr.querySelector(`td[data-key="${col.id}"]`);
+      const val = td ? td.textContent : '';
+      const field = document.createElement('div');
+      field.className = 'col-md-6';
+      field.innerHTML = `
+        <label class="form-label">${col.label}</label>
+        <input class="form-control" name="${col.id}" value="${val.replace(/"/g,'&quot;')}">
+      `;
+      wrap.appendChild(field);
+    });
+    editModal.show();
+  }
+});
+
+/* ===== Submit edit ===== */
+document.getElementById('editForm').addEventListener('submit', (e)=>{
+  e.preventDefault();
+  if(!editingId) return;
+
+  const data = new FormData(e.target);
+  const fields = {};
+  for(const [k,v] of data.entries()){ fields[k]=v; }
+
+  fetch(`/admin/forms/${encodeURIComponent(SLUG)}/submissions/${encodeURIComponent(editingId)}`, {
+    method:'PATCH',
+    headers:{ 'Content-Type':'application/json' },
+    body: JSON.stringify({ fields })
+  }).then(r=>r.json()).then(j=>{
+    if(!j.ok){ alert(j.error||'Update failed'); return; }
+    // Reflect in table
+    const tr = document.querySelector(`tr[data-id="${editingId}"]`);
+    if(tr){
+      Object.entries(fields).forEach(([k,v])=>{
+        const td = tr.querySelector(`td[data-key="${k}"]`);
+        if(td) td.textContent = v;
+      });
+    }
+    editModal.hide();
+    showToast('Updated');
+  }).catch(e=>{ console.error(e); alert('Network error'); });
+});
+</script>
+</body>
+</html>

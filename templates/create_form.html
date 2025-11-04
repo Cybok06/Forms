@@ -1,0 +1,485 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Form Designer • Builder</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="icon" href="https://store-images.s-microsoft.com/image/apps.44537.13628881801009959.f429098c-f6ba-4196-a164-1109adc458e8.5f1e249b-7942-4e1d-aa67-487271e222e5" type="image/x-icon">
+
+<style>
+  /* ===== Tokens ===== */
+  :root{
+    --ink:#0b1320; --muted:#64748b; --ring:#e9ecef; --soft:#f6f8fb; --brand:#0ea5e9; --ok:#16a34a;
+    --card:#ffffff; --shadow:0 12px 36px rgba(2,6,23,.08);
+    --radius-card:16px; --radius-chip:12px; --radius-btn:10px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --ink:#e6e7e9; --muted:#9aa3af; --ring:#2a2f36; --soft:#0e1116; --card:#0f1319;
+      --shadow:0 16px 40px rgba(0,0,0,.35);
+    }
+  }
+  body{ background:var(--soft); color:var(--ink); }
+  .page{ max-width:1100px; margin:32px auto; }
+  .cardx{ background:var(--card); border:1px solid var(--ring); border-radius:var(--radius-card); box-shadow:var(--shadow); }
+  .header-bar{ display:flex; align-items:center; justify-content:space-between; gap:1rem; }
+  .title-required:after{ content:" *"; color:#dc2626; }
+  .req-note{ color:#dc2626; font-weight:600; }
+
+  .btn-icon{ display:inline-flex; align-items:center; gap:.5rem; }
+  .btn-icon svg{ width:18px; height:18px; }
+
+  .chip{
+    border:1px dashed #cbd5e1; border-radius:var(--radius-chip); padding:.65rem .8rem;
+    display:flex; align-items:center; justify-content:space-between; gap:.75rem; background:#fff;
+  }
+  @media (prefers-color-scheme: dark){ .chip{ background:#0f1319; } }
+  .chip .meta small{ color:var(--muted); }
+  .icon-btn{ border:none; background:transparent; cursor:pointer; padding:.35rem; border-radius:8px; }
+  .icon-btn:hover{ background:rgba(0,0,0,.05); }
+  @media (prefers-color-scheme: dark){ .icon-btn:hover{ background:rgba(255,255,255,.06); } }
+  .icon-btn svg{ width:18px; height:18px; color:var(--ink); }
+
+  .image-preview{ max-height:140px; object-fit:cover; border-radius:10px; border:1px solid var(--ring); }
+
+  .theme-list{ display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:.75rem; }
+  @media (max-width:992px){ .theme-list{ grid-template-columns:repeat(3,minmax(0,1fr)); } }
+  @media (max-width:576px){ .theme-list{ grid-template-columns:repeat(2,minmax(0,1fr)); } }
+
+  .theme-card{
+    border:1px solid var(--ring); border-radius:12px; padding:.6rem; cursor:pointer; user-select:none;
+    background:#fff; position:relative;
+  }
+  @media (prefers-color-scheme: dark){ .theme-card{ background:#0f1319; } }
+  .theme-card:hover{ box-shadow:0 8px 18px rgba(2,6,23,.08); }
+  .theme-top{ height:20px; border-radius:8px; }
+  .theme-swatches{ display:flex; align-items:center; gap:6px; margin-top:8px; }
+  .sw{ width:10px; height:10px; border-radius:50%; border:1px solid rgba(0,0,0,.08); }
+  .theme-name{ margin-top:6px; font-size:.85rem; color:var(--muted); }
+  .theme-check{
+    position:absolute; top:6px; right:6px; width:18px; height:18px; border-radius:50%;
+    border:1px solid var(--ring); background:#fff; display:grid; place-items:center;
+  }
+  @media (prefers-color-scheme: dark){ .theme-check{ background:#0f1319; } }
+  .theme-card[aria-checked="true"]{ outline:2px solid color-mix(in srgb, var(--brand) 50%, transparent); }
+  .theme-card[aria-checked="true"] .theme-check{ border-color:var(--brand); }
+  .theme-card[aria-checked="true"] .theme-check svg{ color:var(--brand); }
+
+  .pv-wrap{
+    --pv-ink:var(--ink); --pv-muted:var(--muted); --pv-ring:var(--ring); --pv-soft:var(--soft);
+    --pv-brand:var(--brand); --pv-ok:var(--ok);
+  }
+  .pv-title{ color:var(--pv-ink); }
+  .pv-input{ border:1px solid var(--pv-ring); }
+  .pv-label{ color:var(--pv-ink); }
+  .pv-hint{ color:var(--pv-muted); }
+  .pv-accent{ background:linear-gradient(90deg,var(--pv-brand),var(--pv-ok)); height:3px; border-radius:8px; }
+  .muted{ color:var(--muted); }
+</style>
+</head>
+<body>
+<div class="page container">
+  <div class="header-bar mb-3">
+    <div class="d-flex align-items-center gap-2">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <rect x="3" y="4" width="18" height="16" rx="3"/>
+        <path d="M7 8h10M7 12h6M7 16h8" stroke-linecap="round"/>
+      </svg>
+      <h1 class="h4 m-0">Form Designer</h1>
+    </div>
+    <div class="d-flex gap-2">
+      <a id="viewPublicBtn" class="btn btn-outline-secondary btn-sm" href="#" target="_blank" style="display:none;">
+        View Public
+      </a>
+      <button id="saveBtn" class="btn btn-primary btn-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M5 12h14M12 5v14" stroke-linecap="round"/></svg>
+        <span id="saveLabel">Save Form</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Title + Optional Description + Optional Image -->
+  <div class="cardx p-3 mb-3">
+    <div class="row g-3 align-items-end">
+      <div class="col-lg-4">
+        <label class="form-label title-required">Form Title</label>
+        <input id="formTitle" class="form-control" placeholder="e.g., Customer Onboarding Form"/>
+        <div class="form-text"><span class="req-note">Required.</span></div>
+      </div>
+      <div class="col-lg-5">
+        <label class="form-label">Description (optional)</label>
+        <input id="formDesc" class="form-control" placeholder="Brief description visible under the title"/>
+        <div class="form-text muted">A short sentence to guide respondents.</div>
+      </div>
+      <div class="col-lg-3">
+        <label class="form-label">Form Image (optional)</label>
+        <div class="d-flex gap-2 align-items-center">
+          <input id="formImage" type="file" class="form-control" accept="image/*"/>
+          <button id="uploadImgBtn" class="btn btn-outline-secondary btn-icon" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>
+            Upload
+          </button>
+        </div>
+        <div class="form-text">Stored in GridFS; shows above the form title.</div>
+        <div class="mt-2" id="imgWrap" style="display:none;">
+          <img id="imgPreview" class="image-preview" src="" alt="preview"/>
+          <div><small class="text-muted">Uploaded ✓</small></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Theme Picker -->
+  <div class="cardx p-3 mb-3">
+    <div class="d-flex align-items-center justify-content-between mb-2">
+      <strong>Theme</strong>
+      <small class="text-muted">Pick a palette — applied to the form UI</small>
+    </div>
+    <div id="themeList" class="theme-list"></div>
+  </div>
+
+  <!-- Field designer -->
+  <div class="row g-3">
+    <div class="col-lg-5">
+      <div class="cardx p-3">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <div class="d-flex align-items-center gap-2">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <rect x="3" y="4" width="18" height="16" rx="3"/>
+              <path d="M7 8h10M7 12h6M7 16h8" stroke-linecap="round"/>
+            </svg>
+            <strong>Add Field</strong>
+          </div>
+        </div>
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label">Label</label>
+            <input id="fLabel" class="form-control" placeholder="Full Name"/>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Type</label>
+            <select id="fType" class="form-select">
+              <option value="text">Text</option>
+              <option value="number">Number</option>
+              <option value="email">Email</option>
+              <option value="tel">Phone</option>
+              <option value="date">Date</option>
+              <option value="textarea">Textarea</option>
+            </select>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Placeholder</label>
+            <input id="fPlaceholder" class="form-control" placeholder="e.g., Enter your full name"/>
+          </div>
+          <div class="col-6">
+            <label class="form-label">Required</label>
+            <select id="fRequired" class="form-select">
+              <option value="false">No</option>
+              <option value="true">Yes</option>
+            </select>
+          </div>
+          <div class="col-6">
+            <label class="form-label">Format (mask)</label>
+            <input id="fFormat" class="form-control" placeholder="e.g., 0XXXXXXXX"/>
+            <div class="form-text">X = digit, A = letter, * = any char</div>
+          </div>
+          <div class="col-12 d-grid">
+            <button id="addFieldBtn" class="btn btn-dark btn-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>
+              Add Field
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live Preview -->
+    <div class="col-lg-7">
+      <div class="cardx p-3 pv-wrap" id="pvWrap">
+        <div class="d-flex align-items-center justify-content-between">
+          <strong>Preview</strong>
+          <small class="text-muted">Use arrow icons to reorder fields</small>
+        </div>
+        <div class="pv-accent mt-2 mb-3"></div>
+        <div class="mb-2">
+          <h3 id="pvTitle" class="h5 pv-title">Your Form Title</h3>
+          <p id="pvDesc" class="mb-0 pv-hint" style="display:none;"></p>
+        </div>
+        <div id="pvFields" class="vstack gap-2"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Safe JSON config (no JS parsing of Jinja) -->
+<script id="__config" type="application/json">
+{{ {'edit_slug': edit_slug}|tojson }}
+</script>
+
+<script>
+(function(){
+  // Read server config safely
+  const __cfgEl = document.getElementById('__config');
+  let __cfg = {};
+  try { __cfg = JSON.parse(__cfgEl?.textContent || '{}'); } catch {}
+  const EDIT_SLUG = __cfg.edit_slug || null;
+
+  const state = {
+    title: "",
+    description: "",
+    form_image_id: null,
+    theme: null,
+    fields: [],
+    editSlug: EDIT_SLUG
+  };
+
+  const THEMES = [
+    { key:"sea", name:"Sea Blue",    brand:"#0ea5e9", ok:"#16a34a", ink:"#0b1320", muted:"#64748b", ring:"#e5e7eb", soft:"#f6f8fb" },
+    { key:"indigo", name:"Indigo",   brand:"#6366f1", ok:"#22c55e", ink:"#0b1320", muted:"#64748b", ring:"#e5e7eb", soft:"#f6f8fb" },
+    { key:"amber", name:"Amber",     brand:"#f59e0b", ok:"#10b981", ink:"#0b1320", muted:"#64748b", ring:"#e5e7eb", soft:"#fffaf0" },
+    { key:"rose",  name:"Rose",      brand:"#f43f5e", ok:"#22c55e", ink:"#0b1320", muted:"#64748b", ring:"#f1c6cf", soft:"#fff5f7" },
+    { key:"emerald", name:"Emerald", brand:"#10b981", ok:"#16a34a", ink:"#0b1320", muted:"#64748b", ring:"#d1fae5", soft:"#f0fdf4" },
+    { key:"slate", name:"Slate",     brand:"#334155", ok:"#22c55e", ink:"#0b1320", muted:"#64748b", ring:"#e5e7eb", soft:"#f8fafc" }
+  ];
+
+  const $ = (s)=>document.querySelector(s);
+  const pvFields = $("#pvFields");
+  const pvWrap = $("#pvWrap");
+
+  function uid(){ return "f_" + Math.random().toString(36).slice(2,9); }
+
+  /* ===== Title & Description binding ===== */
+  function syncTitle(){
+    const t = $("#formTitle").value.trim();
+    state.title = t;
+    $("#pvTitle").innerText = t || "Your Form Title";
+  }
+  $("#formTitle").addEventListener("input", syncTitle);
+
+  function syncDesc(){
+    const d = $("#formDesc").value.trim();
+    state.description = d;
+    const el = $("#pvDesc");
+    if(d){ el.style.display = ""; el.innerText = d; }
+    else{ el.style.display = "none"; el.innerText = ""; }
+  }
+  $("#formDesc").addEventListener("input", syncDesc);
+
+  /* ===== Theme picker ===== */
+  function renderThemes(){
+    const wrap = $("#themeList");
+    wrap.innerHTML = "";
+    THEMES.forEach((th)=>{
+      const c = document.createElement("button");
+      c.type = "button";
+      c.className = "theme-card";
+      const checked = state.theme && state.theme.key === th.key;
+      c.setAttribute("role","radio");
+      c.setAttribute("aria-checked", checked ? "true" : "false");
+      c.innerHTML = `
+        <div class="theme-top" style="background: linear-gradient(90deg, ${th.brand}, ${th.ok});"></div>
+        <div class="theme-swatches">
+          <span class="sw" style="background:${th.ink}"></span>
+          <span class="sw" style="background:${th.muted}"></span>
+          <span class="sw" style="background:${th.ring}"></span>
+          <span class="sw" style="background:${th.soft}"></span>
+        </div>
+        <div class="theme-name">${th.name}</div>
+        <div class="theme-check" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M5 12l4 4L19 6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+      `;
+      c.addEventListener("click", ()=> selectTheme(th));
+      wrap.appendChild(c);
+    });
+  }
+  function selectTheme(th){
+    state.theme = {...th};
+    pvWrap.style.setProperty('--pv-ink', th.ink);
+    pvWrap.style.setProperty('--pv-muted', th.muted);
+    pvWrap.style.setProperty('--pv-ring', th.ring);
+    pvWrap.style.setProperty('--pv-soft', th.soft);
+    pvWrap.style.setProperty('--pv-brand', th.brand);
+    pvWrap.style.setProperty('--pv-ok', th.ok);
+    // Update UI
+    [...document.querySelectorAll('.theme-card')].forEach(el=>el.setAttribute('aria-checked','false'));
+    const i = THEMES.findIndex(t=>t.key===th.key);
+    const el = document.querySelectorAll('.theme-card')[i];
+    if(el) el.setAttribute('aria-checked','true');
+  }
+
+  /* ===== GridFS image (optional) ===== */
+  $("#uploadImgBtn").addEventListener("click", async ()=>{
+    const file = $("#formImage").files[0];
+    if(!file){ alert("Choose an image first."); return; }
+    const fd = new FormData(); fd.append("image", file);
+    try{
+      const res = await fetch("/api/upload", { method:"POST", body:fd });
+      const data = await res.json();
+      if(!data.ok){ alert(data.error || "Upload failed"); return; }
+      state.form_image_id = data.file_id;
+      $("#imgWrap").style.display = "";
+      $("#imgPreview").src = `/file/${data.file_id}`;
+    }catch(e){ console.error(e); alert("Network error"); }
+  });
+
+  /* ===== Fields ===== */
+  function fieldChip(f){
+    const div = document.createElement("div");
+    const fmt = f.format ? ` <small class="text-muted">[${f.format}]</small>` : "";
+    div.className = "chip";
+    div.innerHTML = `
+      <div class="meta">
+        <strong>${f.label}</strong> <small>(${f.type})</small>${fmt}
+        ${f.required ? ` <small class="text-danger">• required</small>` : ``}
+      </div>
+      <div class="act d-flex align-items-center gap-1">
+        <button class="icon-btn" data-act="up" title="Move up" aria-label="Move up">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 19V5M5 12l7-7 7 7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button class="icon-btn" data-act="down" title="Move down" aria-label="Move down">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 5v14M5 12l7 7 7-7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button class="icon-btn" data-act="del" title="Delete field" aria-label="Delete field">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M10 11v6M14 11v6" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+    `;
+    div.querySelector(".act").addEventListener("click", (e)=>{
+      const btn = e.target.closest('button[data-act]');
+      if(!btn) return;
+      const act = btn.getAttribute("data-act");
+      const idx = state.fields.findIndex(x=>x.id===f.id);
+      if(idx<0) return;
+      if(act==="del"){ state.fields.splice(idx,1); renderFields(); return; }
+      if(act==="up" && idx>0){ [state.fields[idx-1],state.fields[idx]]=[state.fields[idx],state.fields[idx-1]]; renderFields(); }
+      if(act==="down" && idx<state.fields.length-1){ [state.fields[idx+1],state.fields[idx]]=[state.fields[idx],state.fields[idx+1]]; renderFields(); }
+    });
+    return div;
+  }
+
+  function renderFields(){
+    pvFields.innerHTML = "";
+    state.fields.forEach(f=> pvFields.appendChild(fieldChip(f)));
+  }
+
+  $("#addFieldBtn").addEventListener("click", ()=>{
+    const label = $("#fLabel").value.trim();
+    if(!label){ alert("Label is required."); return; }
+    const type = $("#fType").value;
+    const id = uid(); // temp client id; server derives final id from label
+    const required = $("#fRequired").value === "true";
+    const f = { id, label, type, required };
+
+    const ph = $("#fPlaceholder").value.trim(); if(ph) f.placeholder = ph;
+    const fmt = $("#fFormat").value.trim(); if(fmt) f.format = fmt;
+
+    state.fields.push(f);
+    renderFields();
+
+    ["#fLabel","#fPlaceholder","#fFormat"].forEach(s=> $(s).value="");
+    $("#fRequired").value = "false"; $("#fType").value = "text";
+  });
+
+  /* ===== Save (Create or Update) ===== */
+  $("#saveBtn").addEventListener("click", async ()=>{
+    if(!state.title){ alert("Form Title is required."); $("#formTitle").focus(); return; }
+    if(state.fields.length === 0){ alert("Add at least one field."); return; }
+
+    const payload = {
+      title: state.title,
+      description: state.description || null,
+      theme: state.theme || null,
+      form_image_id: state.form_image_id || null,
+      fields: state.fields
+    };
+
+    try{
+      let res, data;
+      if(state.editSlug){
+        res = await fetch(`/api/forms/${encodeURIComponent(state.editSlug)}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+      }else{
+        res = await fetch("/api/forms", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+      }
+      data = await res.json();
+      if(!data.ok){ alert(data.error || "Save failed"); return; }
+
+      // After save/update, go to public view
+      window.location = data.view_url;
+    }catch(e){ console.error(e); alert("Network error"); }
+  });
+
+  /* ===== Prefill for Edit Mode ===== */
+  async function prefillIfEditing(){
+    if(!state.editSlug){ // new
+      state.theme = {...THEMES[0]};
+      renderThemes(); selectTheme(THEMES[0]);
+      syncTitle(); syncDesc();
+      return;
+    }
+    // Update mode
+    $("#saveLabel").innerText = "Update Form";
+    $("#viewPublicBtn").style.display = "";
+    $("#viewPublicBtn").href = `/f/${encodeURIComponent(state.editSlug)}`;
+
+    try{
+      const res = await fetch(`/api/forms/${encodeURIComponent(state.editSlug)}`);
+      const data = await res.json();
+      if(!data.ok){ alert(data.error || "Failed to load form"); return; }
+
+      const form = data.form || {};
+      // Title/desc
+      $("#formTitle").value = form.title || "";
+      $("#formDesc").value = form.description || "";
+      syncTitle(); syncDesc();
+
+      // Theme
+      const th = form.theme || null;
+      state.theme = th ? {...th} : {...THEMES[0]};
+      renderThemes();
+      const match = THEMES.find(t => t.key === (state.theme.key || "")) || THEMES[0];
+      selectTheme(match);
+
+      // Image
+      if(form.form_image_id){
+        state.form_image_id = form.form_image_id;
+        $("#imgWrap").style.display = "";
+        $("#imgPreview").src = form.form_image_url || `/file/${form.form_image_id}`;
+      }
+
+      // Fields
+      const fs = Array.isArray(form.fields) ? form.fields : [];
+      state.fields = fs.map(f => ({
+        id: f.id || uid(),
+        label: f.label || "",
+        type: f.type || "text",
+        required: !!f.required,
+        placeholder: f.placeholder || "",
+        format: f.format || ""
+      }));
+      renderFields();
+    }catch(e){
+      console.error(e);
+      alert("Network error while loading form.");
+    }
+  }
+
+  // init
+  prefillIfEditing();
+
+})();
+</script>
+</body>
+</html>

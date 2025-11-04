@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Admin • Forms Dashboard</title>
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+<link rel="icon" href="https://store-images.s-microsoft.com/image/apps.44537.13628881801009959.f429098c-f6ba-4196-a164-1109adc458e8.5f1e249b-7942-4e1d-aa67-487271e222e5" type="image/x-icon">
+
+<style>
+  :root{
+    --ink:#0b1320; --muted:#64748b; --ring:#e6eaf2; --soft:#f7f9fc; --surface:#ffffff;
+    --brand:#2563eb; --brand-700:#1d4ed8; --brand-50:#eff6ff;
+    --ok:#16a34a; --bad:#dc2626; --warn:#f59e0b;
+  }
+  [data-theme="dark"]{
+    --ink:#e6e9ef; --muted:#97a3b6; --ring:#2b3140; --soft:#0f172a; --surface:#151b2b;
+    --brand:#3b82f6; --brand-700:#2563eb; --brand-50:#0b1222;
+  }
+  body{ background:var(--soft); color:var(--ink); }
+  .page{ max-width:1200px; margin:32px auto; }
+  .topbar{ border-bottom:1px solid var(--ring); background:linear-gradient(180deg, rgba(37,99,235,.06), transparent 60%), var(--surface); position:sticky; top:0; z-index:20; }
+  .brand-badge{ display:inline-flex; align-items:center; gap:.5rem; padding:.45rem .75rem; border-radius:12px; background:linear-gradient(135deg, var(--brand), var(--brand-700)); color:#fff; font-weight:600; }
+  .brand-badge .mark{ width:22px; height:22px; border-radius:6px; background:#fff2; display:inline-block; }
+
+  .btn-primary{ background:var(--brand); border-color:var(--brand); }
+  .btn-primary:hover{ background:var(--brand-700); border-color:var(--brand-700); }
+  .btn-outline-primary{ color:var(--brand); border-color:var(--brand); }
+  .btn-outline-primary:hover{ background:var(--brand); color:#fff; }
+
+  .kpi{ border-radius:14px; border:1px solid var(--ring); background:var(--surface); padding:16px; transition:transform .12s ease, box-shadow .12s ease; }
+  .kpi:hover{ transform:translateY(-2px); box-shadow:0 10px 28px rgba(2,6,23,.08); }
+  .kpi .kpi-label{ color:var(--muted); font-size:.875rem; }
+  .kpi .kpi-value{ font-size:1.5rem; font-weight:700; }
+
+  .cardx{ border-radius:14px; border:1px solid var(--ring); background:var(--surface); }
+  .table thead th{ background:var(--brand-50); color:var(--ink); border-bottom:1px solid var(--ring); }
+  .table td, .table th{ border-color:var(--ring); }
+  .form-control, .form-select{ background:var(--surface); color:var(--ink); border-color:var(--ring); }
+  .form-control::placeholder{ color:var(--muted); }
+
+  .pager{ border-top:1px solid var(--ring); background:var(--surface); }
+  :focus-visible{ outline:2px solid var(--brand); outline-offset:2px; border-radius:8px; }
+  .fade-in{ opacity:0; transform:translateY(8px); animation:enter .45s cubic-bezier(.2,.65,.3,1) .05s forwards; }
+  @keyframes enter{ to{ opacity:1; transform:none; } }
+
+  /* Slide-out actions */
+  .action-cell{ white-space:nowrap; }
+  .action-core{ display:inline-flex; align-items:center; gap:.35rem; }
+  .row-actions{
+    display:inline-flex; gap:.35rem; margin-left:.35rem;
+    overflow:hidden; max-width:0; opacity:0; transform:translateX(-4px);
+    transition:max-width .28s cubic-bezier(.2,.65,.3,1), opacity .25s ease, transform .25s ease;
+  }
+  .row-actions.open{ max-width:520px; opacity:1; transform:none; }
+  .row-actions .btn, .toggle-actions.btn{ border-radius:10px; }
+
+  .badge-dot{
+    display:inline-flex; align-items:center; gap:.35rem;
+    border:1px solid var(--ring); padding:.15rem .5rem; border-radius:999px;
+    background:var(--surface);
+  }
+  .badge-dot i{ font-size:.7rem; }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="container d-flex align-items-center justify-content-between py-3">
+    <div class="d-flex align-items-center gap-3">
+      <span class="brand-badge"><span class="mark"></span> Admin</span>
+      <span class="text-muted d-none d-md-inline">Forms Dashboard</span>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+      <a class="btn btn-primary d-none d-sm-inline-flex align-items-center gap-2" href="/builder">
+        <i class="bi bi-plus-circle"></i> Create New Form
+      </a>
+      <a class="btn btn-outline-primary d-inline-flex d-sm-none" href="/builder" aria-label="Create">
+        <i class="bi bi-plus-circle"></i>
+      </a>
+    </div>
+  </div>
+</header>
+
+<main class="page container fade-in">
+
+  <!-- KPIs -->
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+      <div class="kpi">
+        <div class="d-flex justify-content-between align-items-center">
+          <span class="kpi-label">Total Forms</span>
+          <i class="bi bi-ui-radios-grid text-primary"></i>
+        </div>
+        <div class="d-flex align-items-baseline gap-2">
+          <div class="kpi-value">{{ total_forms }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="cardx p-3 mb-4">
+    <form class="row g-2 align-items-end" method="get" action="{{ url_for('admin_bp.dashboard') }}">
+      <div class="col-md-6">
+        <label class="form-label small text-muted">Search</label>
+        <div class="input-group">
+          <span class="input-group-text"><i class="bi bi-search"></i></span>
+          <input type="text" class="form-control" name="q" placeholder="Search forms by title…" value="{{ q or '' }}">
+        </div>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small text-muted">Per Page</label>
+        <select class="form-select" name="per_page">
+          {% for n in [10,20,30,50] %}
+            <option value="{{n}}" {% if per_page==n %}selected{% endif %}>Show {{n}}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3 d-grid">
+        <button class="btn btn-primary" type="submit"><i class="bi bi-funnel"></i> Apply</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Forms Table -->
+  <div class="cardx p-0 mb-4">
+    <div class="table-responsive">
+      <table class="table align-middle m-0">
+        <thead>
+          <tr>
+            <th style="width:46%">Title</th>
+            <th class="text-center" style="width:14%">Submissions</th>
+            <th style="width:18%">Created</th>
+            <th style="width:22%" class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for f in forms_list %}
+            <tr id="row-{{ f._id }}">
+              <td class="fw-semibold d-flex align-items-center gap-2">
+                <i class="bi bi-journal-text text-primary"></i>
+                <span>{{ f.title }}</span>
+                {% if f.suspended %}
+                  <span class="badge-dot ms-2" title="Suspended">
+                    <i class="bi bi-dot text-warning"></i><span class="text-muted small">Suspended</span>
+                  </span>
+                {% endif %}
+              </td>
+
+              <td class="text-center">
+                <span class="badge text-bg-light border">{{ f.submissions_count }}</span>
+              </td>
+
+              <td>{{ f.created_at_str }}</td>
+
+              <td class="text-end action-cell">
+                <div class="action-core">
+                  <!-- Always-visible 'Open' -->
+                  <a class="btn btn-sm btn-outline-primary"
+                     href="{{ url_for('admin_bp.view_form', slug=f.slug) }}"
+                     title="Open">
+                    <i class="bi bi-box-arrow-up-right"></i>
+                  </a>
+
+                  <!-- Toggle slide-out -->
+                  <button class="btn btn-sm btn-outline-secondary toggle-actions"
+                          type="button"
+                          aria-expanded="false"
+                          aria-controls="actions-{{ f._id }}"
+                          data-target="actions-{{ f._id }}">
+                    <i class="bi bi-chevron-right"></i>
+                  </button>
+
+                  <!-- Slide-out tray -->
+                  <span id="actions-{{ f._id }}" class="row-actions">
+                    <!-- Edit (uses existing view page with a settings tab hint) -->
+                    <a class="btn btn-sm btn-outline-secondary"
+                       href="{{ url_for('admin_bp.view_form', slug=f.slug) }}?tab=settings#settings"
+                       title="Edit form">
+                      <i class="bi bi-pencil-square"></i> <span class="d-none d-lg-inline">Edit</span>
+                    </a>
+
+                    <!-- Submissions -->
+                    <a class="btn btn-sm btn-outline-secondary"
+                       href="{{ url_for('admin_bp.view_form', slug=f.slug) }}?tab=submissions#submissions"
+                       title="View submissions">
+                      <i class="bi bi-collection"></i> <span class="d-none d-lg-inline">Submissions</span>
+                    </a>
+
+                    <!-- Public link -->
+                    <a class="btn btn-sm btn-outline-secondary"
+                       href="{{ url_for('form_bp.render_form', slug=f.slug) }}"
+                       target="_blank" title="Public link">
+                      <i class="bi bi-link-45deg"></i> <span class="d-none d-lg-inline">Public</span>
+                    </a>
+
+                    <!-- Suspend / Resume (PATCH to the single suspend endpoint) -->
+                    <button class="btn btn-sm {{ 'btn-outline-success' if f.suspended else 'btn-outline-warning' }}"
+                            type="button"
+                            data-action="toggle-suspend"
+                            data-slug="{{ f.slug }}"
+                            data-suspended="{{ 'true' if f.suspended else 'false' }}"
+                            data-endpoint="{{ url_for('admin_bp.suspend_form', slug=f.slug) }}">
+                      {% if f.suspended %}
+                        <i class="bi bi-play-circle"></i> <span class="d-none d-lg-inline">Resume</span>
+                      {% else %}
+                        <i class="bi bi-pause-circle"></i> <span class="d-none d-lg-inline">Suspend</span>
+                      {% endif %}
+                    </button>
+                  </span>
+                </div>
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="4" class="text-center text-muted py-5">No forms found.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if pages > 1 %}
+    <div class="p-3 d-flex justify-content-between align-items-center pager">
+      <div class="text-muted small">Page {{ page }} of {{ pages }}</div>
+      <div class="d-flex gap-2">
+        {% if page > 1 %}
+          <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_bp.dashboard', q=q, per_page=per_page, page=page-1) }}">
+            <i class="bi bi-chevron-left"></i> Prev
+          </a>
+        {% endif %}
+        {% if page < pages %}
+          <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_bp.dashboard', q=q, per_page=per_page, page=page+1) }}">
+            Next <i class="bi bi-chevron-right"></i>
+          </a>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+</main>
+
+<script>
+  // Safe theme toggle (won't error if button/icon absent)
+  (function(){
+    const root=document.documentElement;
+    const btn=document.getElementById('themeToggle');
+    const icon=document.getElementById('themeIcon');
+    const stored=localStorage.getItem('theme-pref');
+    if(stored){ root.setAttribute('data-theme', stored); }
+    function updateIcon(){
+      if(!icon) return;
+      const mode=root.getAttribute('data-theme');
+      icon.classList.toggle('bi-sun', mode==='dark');
+      icon.classList.toggle('bi-moon-stars', mode!=='dark');
+    }
+    updateIcon();
+    btn && btn.addEventListener('click',()=>{
+      const next=(root.getAttribute('data-theme')||'light')==='light'?'dark':'light';
+      root.setAttribute('data-theme',next);
+      localStorage.setItem('theme-pref',next);
+      updateIcon();
+    });
+  })();
+
+  // Slide-out actions (arrow to show/hide the tray)
+  document.addEventListener('click',(e)=>{
+    const t=e.target.closest('.toggle-actions');
+    if(!t) return;
+    const id=t.getAttribute('data-target');
+    const tray=document.getElementById(id);
+    const expanded=t.getAttribute('aria-expanded')==='true';
+
+    // Close all others
+    document.querySelectorAll('.row-actions.open').forEach(el=>el.classList.remove('open'));
+    document.querySelectorAll('.toggle-actions[aria-expanded="true"]').forEach(el=>{
+      el.setAttribute('aria-expanded','false');
+      el.innerHTML='<i class="bi bi-chevron-right"></i>';
+    });
+
+    // Toggle this one
+    if(!expanded){
+      tray?.classList.add('open');
+      t.setAttribute('aria-expanded','true');
+      t.innerHTML='<i class="bi bi-chevron-down"></i>';
+    }else{
+      tray?.classList.remove('open');
+      t.setAttribute('aria-expanded','false');
+      t.innerHTML='<i class="bi bi-chevron-right"></i>';
+    }
+  });
+
+  // Suspend/Resume via PATCH /admin/forms/<slug>/suspend  {suspended: bool}
+  document.addEventListener('click', async (e)=>{
+    const btn = e.target.closest('button[data-action="toggle-suspend"]');
+    if(!btn) return;
+
+    const slug = btn.getAttribute('data-slug');
+    const endpoint = btn.getAttribute('data-endpoint');
+    const current = btn.getAttribute('data-suspended') === 'true';
+    const next = !current;
+    const confirmMsg = next
+      ? 'Suspend this form? It will be unavailable to the public.'
+      : 'Resume this form and make it available?';
+    if(!confirm(confirmMsg)) return;
+
+    try{
+      const res = await fetch(endpoint, {
+        method:'PATCH',
+        headers:{ 'Content-Type':'application/json', 'X-Requested-With':'fetch' },
+        body: JSON.stringify({ suspended: next })
+      });
+      const data = await res.json().catch(()=>({}));
+      if(!res.ok || data.ok===false){ throw new Error(data.error || 'Action failed'); }
+
+      // Update UI
+      btn.setAttribute('data-suspended', String(next));
+      const row = document.getElementById('row-'+btn.closest('tr').id.split('row-')[1]) || btn.closest('tr');
+
+      // Badge
+      let badge = row.querySelector('.badge-dot');
+      if(next){ // now suspended
+        if(!badge){
+          const span = document.createElement('span');
+          span.className='badge-dot ms-2';
+          span.title='Suspended';
+          span.innerHTML='<i class="bi bi-dot text-warning"></i><span class="text-muted small">Suspended</span>';
+          row.querySelector('td').appendChild(span);
+        }
+        btn.classList.remove('btn-outline-success'); btn.classList.add('btn-outline-warning');
+        btn.innerHTML = '<i class="bi bi-pause-circle"></i> <span class="d-none d-lg-inline">Suspend</span>';
+        btn.classList.remove('btn-outline-warning'); btn.classList.add('btn-outline-success'); // flip for resume text below
+        btn.innerHTML = '<i class="bi bi-play-circle"></i> <span class="d-none d-lg-inline">Resume</span>';
+      }else{ // now active
+        badge?.remove();
+        btn.classList.remove('btn-outline-success'); btn.classList.add('btn-outline-warning');
+        btn.innerHTML = '<i class="bi bi-pause-circle"></i> <span class="d-none d-lg-inline">Suspend</span>';
+      }
+
+      toast('Done.');
+    }catch(err){
+      console.error(err);
+      toast('Failed. Try again.');
+    }
+  });
+
+  function toast(msg){
+    const b=document.createElement('div');
+    b.textContent=msg;
+    b.style.position='fixed'; b.style.bottom='16px'; b.style.right='16px';
+    b.style.background='var(--surface)'; b.style.border='1px solid var(--ring)';
+    b.style.padding='8px 12px'; b.style.borderRadius='10px';
+    b.style.boxShadow='0 8px 20px rgba(2,6,23,.15)'; b.style.color='var(--ink)';
+    b.style.zIndex=9999;
+    document.body.appendChild(b);
+    setTimeout(()=>b.remove(),1200);
+  }
+</script>
+</body>
+</html>
