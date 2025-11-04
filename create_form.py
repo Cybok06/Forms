@@ -10,7 +10,8 @@ import io, re, uuid, csv, itertools
 
 form_bp = Blueprint("form_bp", __name__)
 
-ALLOWED_FIELD_TYPES = ["text", "number", "email", "tel", "date", "textarea"]
+# Added "select" for options-based fields
+ALLOWED_FIELD_TYPES = ["text", "number", "email", "tel", "date", "textarea", "select"]
 
 MAX_TITLE_LEN = 120
 MAX_DESC_LEN = 300
@@ -18,6 +19,10 @@ MAX_FIELDS = 100
 MAX_LABEL_LEN = 80
 MAX_PLACEHOLDER_LEN = 120
 MAX_FORMAT_LEN = 64
+
+# Limits for options (for "select")
+MAX_OPTION_COUNT = 100
+MAX_OPTION_LEN = 80
 
 DEFAULT_THEME = {
     "key": "sea",
@@ -32,7 +37,7 @@ DEFAULT_THEME = {
 
 HEX_RE = re.compile(r"^#([0-9a-fA-F]{6})$")
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
-TEL_RE = re.compile(r"^[0-9+()\-.\s]{3,}$")  # permissive, UI should further restrict if needed
+TEL_RE = re.compile(r"^[0-9+()\-.\s]{3,}$")  # permissive; UI can be stricter
 
 def slugify(title: str, col):
     base = re.sub(r"[^a-zA-Z0-9]+", "-", (title or "form")).strip("-").lower() or "form"
@@ -81,11 +86,42 @@ def _sanitize_theme(theme_in: dict | None) -> dict:
     }
     return out
 
+def _coerce_options(raw) -> list[str]:
+    """
+    Accepts list[str] or a newline/comma-separated string from client,
+    returns unique, trimmed, non-empty options (length-limited).
+    """
+    opts = []
+    if isinstance(raw, list):
+        opts = [str(x) for x in raw]
+    elif isinstance(raw, str):
+        # split on newlines or commas
+        parts = re.split(r"[\n,]", raw)
+        opts = [p for p in (s.strip() for s in parts)]
+    else:
+        return []
+
+    # Clean: non-empty, unique (preserve order), length cap
+    seen = set()
+    cleaned = []
+    for o in opts:
+        if not o:
+            continue
+        o = o[:MAX_OPTION_LEN]
+        if o.lower() in seen:
+            continue
+        seen.add(o.lower())
+        cleaned.append(o)
+        if len(cleaned) >= MAX_OPTION_COUNT:
+            break
+    return cleaned
+
 def _sanitize_fields(fields_in):
     if not isinstance(fields_in, list):
         return None, "Invalid fields payload."
     if len(fields_in) > MAX_FIELDS:
         return None, f"Too many fields (max {MAX_FIELDS})."
+
     fields = []
     for f in fields_in:
         if not isinstance(f, dict):
@@ -107,13 +143,25 @@ def _sanitize_fields(fields_in):
         }
 
         placeholder = (f.get("placeholder") or "").strip()[:MAX_PLACEHOLDER_LEN]
-        if placeholder:
+        if placeholder and ftype != "select":  # placeholder not shown for select
             cf["placeholder"] = placeholder
 
         fmt = (f.get("format") or "").strip()[:MAX_FORMAT_LEN]
-        if fmt:
+        if fmt and ftype not in ("select", "date", "textarea"):
             cf["format"] = fmt
             cf["pattern"] = format_to_regex(fmt)
+
+        # NEW: options for "select"
+        if ftype == "select":
+            options_raw = f.get("options") if "options" in f else f.get("options_text", "")
+            options = _coerce_options(options_raw)
+            if not options:
+                return None, f"Field '{label_clean}': add at least one option."
+            cf["options"] = options
+            # Optional default
+            default_val = (f.get("default") or "").strip()
+            if default_val and default_val in options:
+                cf["default"] = default_val
 
         fields.append(cf)
 
@@ -145,17 +193,27 @@ def _validate_field_value(field_def: dict, value: str) -> tuple[bool, str | None
     if field_def.get("required") and value.strip() == "":
         return False, f"Missing required field: {field_def.get('label') or field_def.get('id')}"
 
-    # type-specific light checks
+    # For empty non-required, skip other checks
+    if not field_def.get("required") and value.strip() == "":
+        return True, None
+
+    # type-specific checks
     ftype = field_def.get("type")
     if ftype == "number" and value.strip():
-        try: float(value)
-        except ValueError: return False, f"{field_def.get('label') or field_def.get('id')} must be a number."
+        try:
+            float(value)
+        except ValueError:
+            return False, f"{field_def.get('label') or field_def.get('id')} must be a number."
     if ftype == "email" and value.strip():
         if not EMAIL_RE.match(value.strip()):
             return False, f"{field_def.get('label') or field_def.get('id')} must be a valid email."
     if ftype == "tel" and value.strip():
         if not TEL_RE.match(value.strip()):
             return False, f"{field_def.get('label') or field_def.get('id')} must be a valid phone."
+    if ftype == "select":
+        options = field_def.get("options") or []
+        if options and value not in options:
+            return False, f"{field_def.get('label') or field_def.get('id')} must be one of the provided options."
 
     # mask
     patt = field_def.get("pattern")
@@ -204,8 +262,10 @@ def save_form():
     theme = _sanitize_theme(data.get("theme"))
     form_image_id = data.get("form_image_id") or None
     if form_image_id:
-        try: _ = ObjectId(form_image_id)
-        except Exception: form_image_id = None
+        try:
+            _ = ObjectId(form_image_id)
+        except Exception:
+            form_image_id = None
 
     fields, err = _sanitize_fields(data.get("fields") or [])
     if err:
@@ -222,7 +282,7 @@ def save_form():
         "slug": slug,
         "created_at": now,
         "updated_at": now,
-        "suspended": False,  # NEW: default
+        "suspended": False,  # keep your flag
     }
     forms_col.insert_one(doc)
     return jsonify({"ok": True, "slug": slug, "view_url": f"/f/{slug}"}), 201
@@ -241,7 +301,7 @@ def get_form(slug):
         form["created_at_str"] = form["created_at"].strftime("%Y-%m-%d %H:%M")
     if form.get("updated_at"):
         form["updated_at_str"] = form["updated_at"].strftime("%Y-%m-%d %H:%M")
-    form["suspended"] = bool(form.get("suspended", False))  # ensure presence
+    form["suspended"] = bool(form.get("suspended", False))
     return jsonify({"ok": True, "form": form})
 
 @form_bp.route("/api/forms/<slug>", methods=["PUT", "PATCH"])
@@ -271,8 +331,10 @@ def update_form(slug):
     form_image_id = data.get("form_image_id")
     if form_image_id is not None:
         if form_image_id:
-            try: _ = ObjectId(form_image_id)
-            except Exception: form_image_id = None
+            try:
+                _ = ObjectId(form_image_id)
+            except Exception:
+                form_image_id = None
 
     fields_in = data.get("fields")
     if fields_in is not None:
@@ -293,7 +355,7 @@ def update_form(slug):
     if theme is not None: update_doc["theme"] = theme
     if form_image_id is not None: update_doc["form_image_id"] = form_image_id
     if fields is not None: update_doc["fields"] = fields
-    if suspended_val is not None: update_doc["suspended"] = suspended_val  # NEW
+    if suspended_val is not None: update_doc["suspended"] = suspended_val
 
     forms_col.update_one({"_id": form["_id"]}, {"$set": update_doc})
     return jsonify({"ok": True, "slug": slug, "view_url": f"/f/{slug}"}), 200
@@ -304,7 +366,6 @@ def render_form(slug):
     form = db["forms"].find_one({"slug": slug})
     if not form:
         return "Form not found", 404
-    # If suspended, render same template but in suspended mode; return 403
     if form.get("suspended"):
         return render_template("runtime_form.html", form=form, suspended=True), 403
     return render_template("runtime_form.html", form=form, suspended=False)
@@ -319,9 +380,7 @@ def submit_form(slug):
     if not form:
         return "Form not found", 404
 
-    # Block submissions when suspended
     if form.get("suspended"):
-        # Render the same suspended UI (403)
         return render_template("runtime_form.html", form=form, suspended=True), 403
 
     payload = {
@@ -337,6 +396,11 @@ def submit_form(slug):
         if not fid:
             continue
         value = request.form.get(fid, "")
+        # If select and empty but default exists, apply default
+        if (f.get("type") == "select") and (not value.strip()):
+            d = f.get("default")
+            if d:
+                value = d
         ok, err = _validate_field_value(f, value)
         if not ok:
             return err, 400
