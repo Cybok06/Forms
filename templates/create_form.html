@@ -114,17 +114,19 @@
       </div>
       <div class="col-lg-3">
         <label class="form-label">Form Image (optional)</label>
-        <div class="d-flex gap-2 align-items-center">
-          <input id="formImage" type="file" class="form-control" accept="image/*"/>
-          <button id="uploadImgBtn" class="btn btn-outline-secondary btn-icon" type="button">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>
-            Upload
-          </button>
-        </div>
+        <input id="formImage" type="file" class="form-control" accept="image/*"/>
         <div class="form-text">Stored in GridFS; shows above the form title.</div>
+
+        <!-- Upload state + Preview -->
+        <div class="mt-2" id="imgState" style="display:none;">
+          <div class="d-flex align-items-center gap-2">
+            <div class="spinner-border spinner-border-sm text-primary" role="status" aria-hidden="true"></div>
+            <small class="text-muted" id="imgStateText">Uploading…</small>
+          </div>
+        </div>
         <div class="mt-2" id="imgWrap" style="display:none;">
           <img id="imgPreview" class="image-preview" src="" alt="preview"/>
-          <div><small class="text-muted">Uploaded ✓</small></div>
+          <div class="mt-1"><small class="text-muted" id="imgStatusNote">Uploaded ✓</small></div>
         </div>
       </div>
     </div>
@@ -309,20 +311,64 @@
     if(el) el.setAttribute('aria-checked','true');
   }
 
-  /* ===== GridFS image (optional) ===== */
-  $("#uploadImgBtn").addEventListener("click", async ()=>{
-    const file = $("#formImage").files[0];
-    if(!file){ alert("Choose an image first."); return; }
-    const fd = new FormData(); fd.append("image", file);
+  /* ===== Image auto-upload (GridFS) ===== */
+  const formImageInput = $("#formImage");
+  const imgWrap = $("#imgWrap");
+  const imgPreview = $("#imgPreview");
+  const imgState = $("#imgState");
+  const imgStateText = $("#imgStateText");
+  const imgStatusNote = $("#imgStatusNote");
+
+  formImageInput.addEventListener("change", async ()=>{
+    const file = formImageInput.files && formImageInput.files[0];
+    if(!file) return;
+
+    // Simple type guard (client-side)
+    if(!file.type.startsWith("image/")){
+      alert("Please choose a valid image file.");
+      formImageInput.value = "";
+      return;
+    }
+
+    // Show uploading UI
+    setUploading(true);
+
+    const fd = new FormData();
+    fd.append("image", file);
     try{
       const res = await fetch("/api/upload", { method:"POST", body:fd });
       const data = await res.json();
-      if(!data.ok){ alert(data.error || "Upload failed"); return; }
+      if(!res.ok || !data.ok){
+        throw new Error(data.error || "Upload failed");
+      }
       state.form_image_id = data.file_id;
-      $("#imgWrap").style.display = "";
-      $("#imgPreview").src = `/file/${data.file_id}`;
-    }catch(e){ console.error(e); alert("Network error"); }
+
+      // Show preview
+      imgWrap.style.display = "";
+      imgPreview.src = `/file/${data.file_id}`;
+      imgStatusNote.textContent = "Uploaded ✓";
+      toast("Image uploaded");
+    }catch(err){
+      console.error(err);
+      toast("Image upload failed");
+      // Revert
+      formImageInput.value = "";
+    }finally{
+      setUploading(false);
+    }
   });
+
+  function setUploading(isUploading){
+    if(isUploading){
+      imgState.style.display = "";
+      imgWrap.style.display = "none";
+      imgStateText.textContent = "Uploading…";
+      formImageInput.disabled = true;
+    }else{
+      imgState.style.display = "none";
+      formImageInput.disabled = false;
+    }
+  }
 
   /* ===== Fields ===== */
   function fieldChip(f){
@@ -455,8 +501,9 @@
       // Image
       if(form.form_image_id){
         state.form_image_id = form.form_image_id;
-        $("#imgWrap").style.display = "";
-        $("#imgPreview").src = form.form_image_url || `/file/${form.form_image_id}`;
+        imgWrap.style.display = "";
+        imgPreview.src = form.form_image_url || `/file/${form.form_image_id}`;
+        imgStatusNote.textContent = "Uploaded ✓";
       }
 
       // Fields
@@ -476,7 +523,21 @@
     }
   }
 
+  // Lightweight toast
+  function toast(msg){
+    const b=document.createElement('div');
+    b.textContent=msg;
+    b.style.position='fixed'; b.style.bottom='16px'; b.style.right='16px';
+    b.style.background='var(--card)'; b.style.border='1px solid var(--ring)';
+    b.style.padding='8px 12px'; b.style.borderRadius='10px';
+    b.style.boxShadow='0 8px 20px rgba(2,6,23,.15)'; b.style.color='var(--ink)';
+    b.style.zIndex=9999;
+    document.body.appendChild(b);
+    setTimeout(()=>b.remove(),1400);
+  }
+
   // init
+  renderThemes();
   prefillIfEditing();
 
 })();
