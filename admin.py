@@ -45,8 +45,11 @@ def _field_map(form):
 def _field_order(form):
     return [f.get("id") for f in (form.get("fields") or []) if f.get("id")]
 
-def _build_dataframe_without_submitted_at(form, submissions):
-    """Excel export: ONLY the field columns (omit 'Submitted At')."""
+def _build_dataframe_without_submitted_at(form, submissions, include_no=True):
+    """
+    Excel export helper: builds a DataFrame with ONLY the field columns
+    (omits 'Submitted At'). If include_no=True, prepends 'No' column 1..N.
+    """
     if pd is None:
         return None
     cols = _field_order(form)
@@ -55,6 +58,8 @@ def _build_dataframe_without_submitted_at(form, submissions):
     for s in submissions:
         rows.append([s.get("fields", {}).get(cid, "") for cid in cols])
     df = pd.DataFrame(rows, columns=headers)
+    if include_no:
+        df.insert(0, "No", range(1, len(df) + 1))
     return df
 
 # ----------------- routes -----------------
@@ -84,8 +89,7 @@ def dashboard():
         r["_id"] = str(r["_id"])
         r["created_at_str"] = _format_dt(r.get("created_at"))
         r["submissions_count"] = counts_by_slug.get(r["slug"], 0)
-        # ensure suspended key is present (default False)
-        r["suspended"] = bool(r.get("suspended", False))
+        r["suspended"] = bool(r.get("suspended", False))  # ensure key present
 
     pages = math.ceil(total_match / per_page) if per_page else 1
     return render_template(
@@ -165,7 +169,6 @@ def update_submission(slug, sub_id):
     if not isinstance(new_fields, dict):
         return jsonify({"ok": False, "error": "Invalid payload"}), 400
 
-    # Simple merge without revalidating masks here (left minimal, you can plug your validators if needed)
     merged = dict(sub.get("fields") or {})
     for fid, val in new_fields.items():
         merged[fid] = "" if val is None else str(val)
@@ -226,7 +229,10 @@ def delete_form(slug):
 
 @admin_bp.route("/forms/<slug>/export/<fmt>", methods=["GET"])
 def export_form(slug, fmt):
-    """Excel export excludes Submitted At; PDF includes it."""
+    """
+    Excel export excludes 'Submitted At'; PDF includes it.
+    Both now prepend a 'No' column that numbers the rows starting at 1.
+    """
     db = current_app.mongo_db
     forms = db["forms"]
     subs = db["submissions"]
@@ -239,7 +245,7 @@ def export_form(slug, fmt):
     if fmt.lower() in ("xlsx", "excel"):
         if pd is None:
             abort(400, "Excel export requires 'pandas' and 'openpyxl' (pip install pandas openpyxl)")
-        df = _build_dataframe_without_submitted_at(form, submissions)
+        df = _build_dataframe_without_submitted_at(form, submissions, include_no=True)
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine="openpyxl") as writer:
             df.to_excel(writer, index=False, sheet_name="Submissions")
@@ -255,10 +261,11 @@ def export_form(slug, fmt):
             styles = getSampleStyleSheet()
         except Exception:
             abort(400, "PDF export requires 'reportlab' (pip install reportlab)")
-        headers = ["Submitted At"] + [f.get("label", f["id"]) for f in form.get("fields", [])]
+        # headers: No + Submitted At + field labels
+        headers = ["No", "Submitted At"] + [f.get("label", f["id"]) for f in form.get("fields", [])]
         data = [headers]
-        for s in submissions:
-            row = [_format_dt(s.get("created_at"))]
+        for idx, s in enumerate(submissions, start=1):
+            row = [str(idx), _format_dt(s.get("created_at"))]
             for f in form.get("fields", []):
                 row.append(s.get("fields", {}).get(f["id"], "")) 
             data.append(row)
