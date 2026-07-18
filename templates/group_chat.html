@@ -1,0 +1,599 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>{{ group.name }} - Group Chat</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+<link rel="icon" href="https://store-images.s-microsoft.com/image/apps.44537.13628881801009959.f429098c-f6ba-4196-a164-1109adc458e8.5f1e249b-7942-4e1d-aa67-487271e222e5" type="image/x-icon">
+<style>
+  :root{
+    --wa:#356BEA; --wa2:#7EA8FF; --send:#EAF1FF; --incoming:#ffffff;
+    --ink:#0D1B46; --muted:#8A94A6; --ring:#E5EAF5; --panel:#F6F9FF;
+  }
+  *{ box-sizing:border-box; }
+  body{
+    margin:0;
+    height:100vh;
+    background:
+      linear-gradient(180deg, rgba(7,94,84,.12), rgba(255,255,255,.86)),
+      #e9f1ee;
+    color:var(--ink);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+    overflow:hidden;
+  }
+  body::before{
+    content:"";
+    position:fixed;
+    inset:-120px;
+    background-image:url("{{ url_for('public_groups_bp.group_search_bg_image') }}");
+    background-repeat:repeat;
+    background-size:120px 120px;
+    opacity:.09;
+    animation:drift 38s linear infinite;
+    z-index:-1;
+  }
+  @keyframes drift{ from{background-position:0 0;} to{background-position:480px 360px;} }
+  .shell{
+    height:100vh;
+    max-width:1180px;
+    margin:0 auto;
+    display:grid;
+    grid-template-columns:minmax(0,1fr) 330px;
+    padding:18px;
+    gap:14px;
+  }
+  .chat{
+    min-height:0;
+    overflow:hidden;
+    display:grid;
+    grid-template-rows:auto 1fr auto;
+    background:rgba(255,255,255,.74);
+    border:1px solid rgba(255,255,255,.82);
+    border-radius:8px;
+    box-shadow:0 24px 70px rgba(15,23,42,.14);
+    backdrop-filter:blur(16px);
+  }
+  .chat-head{
+    background:linear-gradient(135deg, var(--wa), var(--wa2));
+    color:#fff;
+    padding:12px 14px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+  }
+  .avatar{
+    width:42px; height:42px; border-radius:50%;
+    display:inline-flex; align-items:center; justify-content:center;
+    background:rgba(255,255,255,.2);
+    border:1px solid rgba(255,255,255,.25);
+    font-weight:800;
+    flex:0 0 auto;
+  }
+  .head-title{ font-weight:750; line-height:1.15; }
+  .head-sub{ font-size:.82rem; opacity:.82; }
+  .messages{
+    min-height:0;
+    overflow:auto;
+    padding:22px;
+    background:
+      linear-gradient(180deg, rgba(255,255,255,.38), rgba(236,245,241,.52)),
+      rgba(236,245,241,.78);
+  }
+  .bubble-row{ display:flex; margin-bottom:10px; }
+  .bubble-row.mine{ justify-content:flex-end; }
+  .bubble{
+    position:relative;
+    max-width:min(76%, 620px);
+    border-radius:8px;
+    padding:8px 10px 7px;
+    background:var(--incoming);
+    box-shadow:0 1px 2px rgba(15,23,42,.12);
+    border:1px solid rgba(15,23,42,.05);
+  }
+  .mine .bubble{ background:var(--send); }
+  .sender{ font-size:.76rem; font-weight:800; color:#356BEA; margin-bottom:3px; }
+  .msg-text{ white-space:pre-wrap; word-break:break-word; font-size:.95rem; line-height:1.35; }
+  .reply-box{
+    border-left:3px solid #356BEA;
+    background:rgba(255,255,255,.58);
+    border-radius:6px;
+    padding:6px 8px;
+    margin-bottom:6px;
+    font-size:.82rem;
+    color:#334155;
+  }
+  .reply-name{ font-weight:800; color:#356BEA; }
+  .deleted-text{ color:#64748b; font-style:italic; }
+  .edited{ color:#64748b; font-size:.68rem; margin-left:.25rem; }
+  .msg-actions{
+    display:flex;
+    justify-content:flex-end;
+    gap:4px;
+    margin-top:4px;
+    opacity:.35;
+    transition:opacity .14s ease;
+  }
+  .bubble:hover .msg-actions{ opacity:1; }
+  .msg-action{
+    border:0;
+    background:rgba(255,255,255,.7);
+    color:#536471;
+    border-radius:999px;
+    padding:2px 6px;
+    font-size:.76rem;
+  }
+  .msg-action:hover{ background:#fff; color:var(--wa); }
+  .reactions{
+    display:flex;
+    gap:4px;
+    flex-wrap:wrap;
+    justify-content:flex-end;
+    margin-top:4px;
+  }
+  .reaction-pill{
+    border:1px solid rgba(15,23,42,.08);
+    background:rgba(255,255,255,.86);
+    border-radius:999px;
+    padding:1px 7px;
+    font-size:.78rem;
+    box-shadow:0 1px 2px rgba(15,23,42,.08);
+  }
+  .reaction-menu{
+    display:none;
+    gap:4px;
+    margin-top:4px;
+    justify-content:flex-end;
+  }
+  .reaction-menu.open{ display:flex; }
+  .reaction-menu button{
+    border:1px solid rgba(15,23,42,.08);
+    background:#fff;
+    border-radius:999px;
+    width:30px;
+    height:30px;
+  }
+  .msg-img{
+    display:block;
+    max-width:280px;
+    width:100%;
+    border-radius:8px;
+    margin:.25rem 0 .35rem;
+    border:1px solid rgba(15,23,42,.08);
+  }
+  .image-wrap{
+    position:relative;
+    max-width:280px;
+    min-width:180px;
+    min-height:120px;
+    margin:.25rem 0 .35rem;
+    border-radius:8px;
+    overflow:hidden;
+    background:#eef2f7;
+  }
+  .image-wrap .msg-img{ margin:0; opacity:0; transition:opacity .18s ease; }
+  .image-wrap.loaded{ min-height:0; background:transparent; }
+  .image-wrap.loaded .msg-img{ opacity:1; }
+  .image-loader{
+    position:absolute;
+    inset:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    color:#475569;
+    font-size:.82rem;
+    background:linear-gradient(135deg, #f8fafc, #e2e8f0);
+  }
+  .image-wrap.loaded .image-loader{ display:none; }
+  .image-wrap.failed .image-loader{ color:#991b1b; background:#fee2e2; }
+  .mini-spinner{
+    width:16px;
+    height:16px;
+    border:2px solid rgba(71,85,105,.25);
+    border-top-color:#356BEA;
+    border-radius:50%;
+    animation:spin .8s linear infinite;
+  }
+  .image-wrap.failed .mini-spinner{ display:none; }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+  .time{ text-align:right; color:#64748b; font-size:.7rem; margin-top:2px; }
+  .composer{
+    background:#f0f2f5;
+    border-top:1px solid var(--ring);
+    padding:10px;
+  }
+  .composer form{ display:flex; align-items:end; gap:8px; }
+  .icon-btn{
+    width:44px; height:44px; border-radius:50%;
+    border:1px solid var(--ring); background:#fff; color:#536471;
+    display:inline-flex; align-items:center; justify-content:center;
+    flex:0 0 auto;
+  }
+  .icon-btn:hover{ background:#eef6f3; color:var(--wa); }
+  .message-input{
+    min-height:44px;
+    max-height:120px;
+    resize:none;
+    border-radius:8px;
+    border-color:var(--ring);
+  }
+  .send-btn{
+    width:46px; height:46px; border-radius:50%;
+    border:0; background:var(--wa2); color:#fff;
+    display:inline-flex; align-items:center; justify-content:center;
+    flex:0 0 auto;
+  }
+  .profile{
+    min-height:0;
+    overflow:auto;
+    background:rgba(255,255,255,.86);
+    border:1px solid rgba(255,255,255,.82);
+    border-radius:8px;
+    box-shadow:0 18px 48px rgba(15,23,42,.12);
+    backdrop-filter:blur(16px);
+  }
+  .profile-cover{
+    background:linear-gradient(135deg, var(--wa), var(--wa2));
+    color:#fff;
+    padding:22px 18px;
+    text-align:center;
+  }
+  .profile-avatar{
+    width:72px; height:72px; border-radius:50%;
+    margin:0 auto 10px;
+    display:flex; align-items:center; justify-content:center;
+    background:rgba(255,255,255,.22);
+    border:1px solid rgba(255,255,255,.28);
+    font-size:1.45rem;
+    font-weight:800;
+  }
+  .member{
+    display:flex; align-items:flex-start; gap:10px;
+    padding:11px 14px;
+    border-bottom:1px solid #eef2f7;
+  }
+  .member-badge{
+    width:34px; height:34px; border-radius:50%;
+    display:inline-flex; align-items:center; justify-content:center;
+    background:#ecfdf5; color:#047857;
+    flex:0 0 auto;
+  }
+  .member-name{ font-weight:700; font-size:.92rem; }
+  .member-details{ color:var(--muted); font-size:.78rem; word-break:break-word; }
+  .preview{
+    display:none;
+    align-items:center;
+    gap:8px;
+    margin:0 0 8px 52px;
+    color:var(--muted);
+    font-size:.85rem;
+  }
+  .reply-preview{
+    display:none;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    margin:0 0 8px 52px;
+    padding:8px 10px;
+    border-left:3px solid var(--wa2);
+    border-radius:8px;
+    background:#fff;
+    color:#334155;
+    font-size:.86rem;
+  }
+  .reply-preview.open{ display:flex; }
+  .reply-preview strong{ color:#356BEA; }
+  .preview img{ width:44px; height:44px; object-fit:cover; border-radius:8px; border:1px solid var(--ring); }
+  @media(max-width:900px){
+    body{ overflow:auto; }
+    .shell{ height:auto; min-height:100vh; grid-template-columns:1fr; padding:0; gap:0; }
+    .chat{ min-height:100vh; border-radius:0; }
+    .profile{ display:none; border-radius:0; }
+    .profile.open{ display:block; position:fixed; inset:0; z-index:20; }
+    .bubble{ max-width:88%; }
+  }
+</style>
+<link href="{{ url_for('static', filename='app_theme.css') }}" rel="stylesheet">
+</head>
+<body>
+<div class="shell">
+  <section class="chat">
+    <header class="chat-head">
+      <div class="d-flex align-items-center gap-2 min-w-0">
+        <a class="btn btn-sm text-white p-1" href="{{ url_for('public_groups_bp.public_group_search', group_id=detail._id, q=current_member.label) }}" title="Back">
+          <i class="bi bi-arrow-left"></i>
+        </a>
+        <span class="avatar">{{ group.name.replace('Group ', '')[:2] }}</span>
+        <div class="min-w-0">
+          <div class="head-title">{{ group.name }}</div>
+          <div class="head-sub">{{ group.members|length }} members - chatting as {{ current_member.label }}</div>
+        </div>
+      </div>
+      <button class="btn btn-sm text-white border-0" id="profileToggle" type="button" title="View group profile">
+        <i class="bi bi-three-dots-vertical fs-5"></i>
+      </button>
+    </header>
+
+    <div class="messages" id="messages">
+      {% if not messages %}
+        <div class="text-center text-muted mt-5" id="emptyState">
+          <i class="bi bi-chat-dots fs-1 d-block mb-2"></i>
+          No messages yet. Start the conversation.
+        </div>
+      {% endif %}
+    </div>
+
+    <footer class="composer">
+      <div class="reply-preview" id="replyPreview">
+        <div>
+          <strong id="replyName"></strong>
+          <div id="replyBody"></div>
+        </div>
+        <button class="btn btn-sm btn-link text-danger p-0" type="button" id="clearReply">Cancel</button>
+      </div>
+      <div class="preview" id="preview">
+        <img id="previewImg" alt="Selected image preview">
+        <span id="previewName"></span>
+        <button class="btn btn-sm btn-link text-danger p-0" type="button" id="clearImage">Remove</button>
+      </div>
+      <form id="chatForm" enctype="multipart/form-data">
+        <input type="hidden" name="sender_id" value="{{ current_member.submission_id }}">
+        <input type="hidden" name="reply_to" id="replyToInput" value="">
+        <input class="d-none" id="imageInput" name="image" type="file" accept="image/*">
+        <button class="icon-btn" type="button" id="pickImage" title="Attach image"><i class="bi bi-image"></i></button>
+        <textarea class="form-control message-input" name="message" rows="1" placeholder="Type a message"></textarea>
+        <button class="send-btn" type="submit" title="Send"><i class="bi bi-send-fill"></i></button>
+      </form>
+    </footer>
+  </section>
+
+  <aside class="profile" id="profile">
+    <div class="profile-cover">
+      <button class="btn btn-sm text-white float-end d-lg-none" type="button" id="closeProfile"><i class="bi bi-x-lg"></i></button>
+      <div class="profile-avatar">{{ group.name.replace('Group ', '')[:2] }}</div>
+      <h1 class="h4 m-0">{{ group.name }}</h1>
+      <div class="small opacity-75">{{ detail.title }}</div>
+    </div>
+    <div class="p-3 border-bottom">
+      <div class="fw-semibold">Group profile</div>
+      <div class="text-muted small">{{ group.members|length }} members can view and send messages in this chat.</div>
+    </div>
+    <div>
+      {% for member in group.members %}
+        <div class="member">
+          <span class="member-badge"><i class="bi bi-person"></i></span>
+          <div>
+            <div class="member-name">{{ member.label }}</div>
+            <div class="member-details">
+              {% for key, value in member.fields.items() %}
+                {% if value %}<span class="me-1">{{ value }}</span>{% endif %}
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  </aside>
+</div>
+
+<script>
+const CURRENT_ID = {{ current_member.submission_id|tojson }};
+const INITIAL_MESSAGES = {{ messages|tojson }};
+const REACTION_SET = ['👍','❤️','😂','😮','🙏','👏'];
+const messagesEl = document.getElementById('messages');
+const emptyState = document.getElementById('emptyState');
+const form = document.getElementById('chatForm');
+const imageInput = document.getElementById('imageInput');
+const preview = document.getElementById('preview');
+const previewImg = document.getElementById('previewImg');
+const previewName = document.getElementById('previewName');
+const replyPreview = document.getElementById('replyPreview');
+const replyToInput = document.getElementById('replyToInput');
+const replyName = document.getElementById('replyName');
+const replyBody = document.getElementById('replyBody');
+const profile = document.getElementById('profile');
+
+function scrollBottom(){ messagesEl.scrollTop = messagesEl.scrollHeight; }
+
+function esc(s){
+  return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function canEdit(message){
+  if(message.sender_id !== CURRENT_ID || message.deleted_at) return false;
+  const created = new Date(message.created_at);
+  return Number.isFinite(created.getTime()) && (Date.now() - created.getTime()) <= 60 * 60 * 1000;
+}
+
+function reactionSummary(reactions){
+  return Object.entries(reactions || {})
+    .filter(([, members]) => Array.isArray(members) && members.length)
+    .map(([emoji, members]) => `<span class="reaction-pill">${esc(emoji)} ${members.length}</span>`)
+    .join('');
+}
+
+function replyHtml(reply){
+  if(!reply) return '';
+  const body = reply.body || (reply.has_image ? 'Image' : '');
+  return `
+    <div class="reply-box">
+      <div class="reply-name">${esc(reply.sender_name)}</div>
+      <div>${esc(body)}</div>
+    </div>
+  `;
+}
+
+function renderMessage(message){
+  emptyState?.remove();
+  const mine = message.sender_id === CURRENT_ID;
+  let row = document.querySelector(`[data-id="${message._id}"]`);
+  if(!row){
+    row = document.createElement('div');
+    row.dataset.id = message._id;
+    messagesEl.appendChild(row);
+  }
+  row.className = `bubble-row ${mine ? 'mine' : ''}`;
+  const image = !message.deleted_at && message.image && message.image.url
+    ? `
+      <div class="image-wrap">
+        <img class="msg-img" src="${esc(message.image.url)}" alt="Uploaded chat image" onload="markImageLoaded(this)" onerror="markImageFailed(this)">
+        <div class="image-loader"><span class="mini-spinner"></span><span>image loading</span></div>
+      </div>
+    `
+    : '';
+  const body = message.deleted_at
+    ? '<div class="msg-text deleted-text">This message was deleted</div>'
+    : `${image}${message.message ? `<div class="msg-text">${esc(message.message)}</div>` : ''}`;
+  const actions = message.deleted_at ? '' : `
+    <div class="msg-actions">
+      <button class="msg-action" type="button" onclick="startReply('${esc(message._id)}')" title="Reply"><i class="bi bi-reply"></i></button>
+      <button class="msg-action" type="button" onclick="toggleReactions('${esc(message._id)}')" title="React"><i class="bi bi-emoji-smile"></i></button>
+      ${mine ? `<button class="msg-action" type="button" onclick="editMessage('${esc(message._id)}')" title="Edit" ${canEdit(message) ? '' : 'disabled'}><i class="bi bi-pencil"></i></button>` : ''}
+      ${mine ? `<button class="msg-action" type="button" onclick="deleteMessage('${esc(message._id)}')" title="Delete"><i class="bi bi-trash"></i></button>` : ''}
+    </div>
+    <div class="reaction-menu" id="react-${esc(message._id)}">
+      ${REACTION_SET.map(e => `<button type="button" onclick="reactMessage('${esc(message._id)}','${e}')">${e}</button>`).join('')}
+    </div>
+  `;
+  row.innerHTML = `
+    <div class="bubble">
+      ${mine ? '' : `<div class="sender">${esc(message.sender_name)}</div>`}
+      ${replyHtml(message.reply_to)}
+      ${body}
+      <div class="reactions">${reactionSummary(message.reactions)}</div>
+      <div class="time">${esc(message.created_at_str)}${message.edited_at ? '<span class="edited">edited</span>' : ''}</div>
+      ${actions}
+    </div>
+  `;
+}
+
+function markImageLoaded(img){
+  img.closest('.image-wrap')?.classList.add('loaded');
+}
+
+function markImageFailed(img){
+  const wrap = img.closest('.image-wrap');
+  if(!wrap) return;
+  wrap.classList.add('failed');
+  const loader = wrap.querySelector('.image-loader');
+  if(loader) loader.innerHTML = '<span>Image failed to load</span>';
+}
+
+async function loadMessages(){
+  try{
+    const res = await fetch(location.pathname + '/messages');
+    const data = await res.json();
+    if(!data.ok) return;
+    data.messages.forEach(renderMessage);
+  }catch(e){}
+}
+
+function messageById(id){
+  return Array.from(document.querySelectorAll('.bubble-row')).find(row => row.dataset.id === id);
+}
+
+function startReply(id){
+  const row = messageById(id);
+  if(!row) return;
+  const sender = row.querySelector('.sender')?.textContent || 'You';
+  const text = row.querySelector('.msg-text')?.textContent || 'Image';
+  replyToInput.value = id;
+  replyName.textContent = sender;
+  replyBody.textContent = text.slice(0, 140);
+  replyPreview.classList.add('open');
+  form.querySelector('textarea[name="message"]').focus();
+}
+
+document.getElementById('clearReply').addEventListener('click', ()=>{
+  replyToInput.value = '';
+  replyPreview.classList.remove('open');
+});
+
+function toggleReactions(id){
+  document.querySelectorAll('.reaction-menu.open').forEach(el => {
+    if(el.id !== `react-${id}`) el.classList.remove('open');
+  });
+  document.getElementById(`react-${id}`)?.classList.toggle('open');
+}
+
+async function reactMessage(id, emoji){
+  const res = await fetch(`${location.pathname}/messages/${encodeURIComponent(id)}/react`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ sender_id: CURRENT_ID, emoji })
+  });
+  const data = await res.json();
+  if(!data.ok){ alert(data.error || 'Reaction failed'); return; }
+  renderMessage(data.message);
+}
+
+async function editMessage(id){
+  const row = messageById(id);
+  const current = row?.querySelector('.msg-text')?.textContent || '';
+  const next = prompt('Edit your message', current);
+  if(next === null) return;
+  const res = await fetch(`${location.pathname}/messages/${encodeURIComponent(id)}`, {
+    method:'PATCH',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ sender_id: CURRENT_ID, message: next })
+  });
+  const data = await res.json();
+  if(!data.ok){ alert(data.error || 'Edit failed'); return; }
+  renderMessage(data.message);
+}
+
+async function deleteMessage(id){
+  if(!confirm('Delete this message?')) return;
+  const res = await fetch(`${location.pathname}/messages/${encodeURIComponent(id)}?sender_id=${encodeURIComponent(CURRENT_ID)}`, { method:'DELETE' });
+  const data = await res.json();
+  if(!data.ok){ alert(data.error || 'Delete failed'); return; }
+  renderMessage(data.message);
+}
+
+form.addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const fd = new FormData(form);
+  const btn = form.querySelector('.send-btn');
+  btn.disabled = true;
+  try{
+    const res = await fetch(location.pathname + '/messages', { method:'POST', body:fd });
+    const data = await res.json();
+    if(!data.ok){ alert(data.error || 'Message failed'); return; }
+    renderMessage(data.message);
+    form.reset();
+    preview.style.display = 'none';
+    replyToInput.value = '';
+    replyPreview.classList.remove('open');
+    scrollBottom();
+  }catch(err){
+    alert('Network error. Try again.');
+  }finally{
+    btn.disabled = false;
+  }
+});
+
+document.getElementById('pickImage').addEventListener('click', ()=> imageInput.click());
+imageInput.addEventListener('change', ()=>{
+  const file = imageInput.files[0];
+  if(!file){ preview.style.display = 'none'; return; }
+  previewImg.src = URL.createObjectURL(file);
+  previewName.textContent = file.name;
+  preview.style.display = 'flex';
+});
+document.getElementById('clearImage').addEventListener('click', ()=>{
+  imageInput.value = '';
+  preview.style.display = 'none';
+});
+
+document.getElementById('profileToggle').addEventListener('click', ()=> profile.classList.toggle('open'));
+document.getElementById('closeProfile')?.addEventListener('click', ()=> profile.classList.remove('open'));
+
+INITIAL_MESSAGES.forEach(renderMessage);
+scrollBottom();
+setInterval(loadMessages, 5000);
+</script>
+</body>
+</html>

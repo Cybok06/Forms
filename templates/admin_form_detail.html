@@ -1,0 +1,755 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Form • {{ form.title }}</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+<link rel="icon" href="https://store-images.s-microsoft.com/image/apps.44537.13628881801009959.f429098c-f6ba-4196-a164-1109adc458e8.5f1e249b-7942-4e1d-aa67-487271e222e5" type="image/x-icon">
+
+<style>
+  :root{
+    --ink:#0D1B46; --muted:#8A94A6; --ring:#E5EAF5; --ring-2:#D5DEF0;
+    --soft:#EAF1FF; --brand:#356BEA; --brand-700:#2455c9; --ok:#16a34a; --bad:#dc2626; --surface:#ffffff;
+    --header-fg:#ffffff; --header-bg:#356BEA; --header-bg-2:#7EA8FF;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --ink:#0D1B46; --muted:#8A94A6; --ring:#E5EAF5; --ring-2:#D5DEF0;
+      --soft:#EAF1FF; --surface:#ffffff; --header-fg:#ffffff; --header-bg:#356BEA; --header-bg-2:#7EA8FF;
+    }
+  }
+  body{ background:var(--soft); color:var(--ink); font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+
+  /* Navbar */
+  .navbar-custom{ background: var(--surface); border-bottom:1px solid var(--ring); }
+  .navbar .nav-link{ color: var(--ink); }
+  .navbar .nav-link.active{ font-weight:600; }
+  .navbar .btn-outline-secondary{ border-color: var(--ring); }
+
+  /* Layout */
+  .page{ max-width:1200px; margin:24px auto; padding-top: 12px; }
+  @media (min-width: 992px){ .page{ margin-top:32px; } }
+
+  .cardx{ border-radius:14px; border:1px solid var(--ring); background:var(--surface); box-shadow:0 12px 30px rgba(2,6,23,.06); }
+
+  /* ===== Excel-like table ===== */
+  .excel-wrap{ border-top-left-radius: 14px; border-top-right-radius: 14px; overflow: hidden; }
+  .excel-table{
+    border-collapse: separate; /* keeps sticky header shadows clean */
+    border-spacing: 0;
+    width: 100%;
+    background: var(--surface);
+  }
+  .excel-table thead th{
+    position: sticky; top: 0; z-index: 5;
+    color: var(--header-fg);
+    background: linear-gradient(180deg, var(--header-bg), var(--header-bg-2));
+    font-weight: 700;
+    border-top: 1px solid var(--ring-2);
+    border-bottom: 2px solid var(--ring-2);
+    text-transform: none;
+    vertical-align: middle;
+    white-space: nowrap;
+    padding: .75rem .75rem;
+    box-shadow: 0 2px 0 rgba(0,0,0,.04);
+  }
+  .excel-table tbody td, .excel-table thead th, .excel-table tfoot td{
+    border-left: 1px solid var(--ring);
+    border-right: 1px solid var(--ring);
+  }
+  .excel-table tbody td{
+    border-bottom: 1px solid var(--ring);
+    vertical-align: top;
+    padding: .6rem .65rem;
+    background: var(--surface);
+  }
+  /* outer border */
+  .excel-table{
+    border: 1px solid var(--ring-2);
+  }
+  /* zebra */
+  .excel-table tbody tr:nth-child(odd) td{ background: color-mix(in srgb, var(--soft) 45%, transparent); }
+  .excel-table tbody tr:hover td{ background: color-mix(in srgb, var(--brand) 12%, var(--surface)); transition: background .12s ease; }
+
+  /* 🔴 Duplicate highlighting */
+  .dup-row td{
+    background: color-mix(in srgb, var(--bad) 8%, var(--surface)) !important;
+  }
+  .dup-row:hover td{
+    background: color-mix(in srgb, var(--bad) 14%, var(--surface)) !important;
+  }
+
+  /* Group badge (A, B, C...) */
+  .dup-badge{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    font-size:.7rem;
+    font-weight:600;
+    border-radius:999px;
+    padding:0.15rem .45rem;
+    margin-left:.35rem;
+    background: color-mix(in srgb, var(--bad) 12%, #ffffff);
+    color: var(--bad);
+    border:1px solid color-mix(in srgb, var(--bad) 35%, transparent);
+  }
+
+  /* Hide pagination (no paging UI) */
+  .excel-table tfoot{
+    display:none;
+  }
+
+  /* action column */
+  .col-actions{ width:1%; white-space: nowrap; }
+
+  .badge-code{ font-family: ui-monospace, Menlo, Consolas, monospace; }
+
+  .share-input{ max-width:520px; }
+  .search-bar .form-control{ height: 44px; }
+
+  /* KPI */
+  .kpi{ border:1px solid var(--ring); border-radius:14px; background:var(--surface); padding:16px; }
+  .kpi .label{ color:var(--muted); font-size:.85rem; }
+  .kpi .value{ font-weight:700; font-size:1.6rem; color:var(--brand); line-height:1; }
+
+  /* Toast */
+  #toast{
+    position: fixed; right: 16px; bottom: 16px; z-index: 9999;
+    background: var(--surface); color: var(--ink); border:1px solid var(--ring);
+    border-radius: 10px; padding:10px 12px; box-shadow:0 8px 22px rgba(2,6,23,.15); display:none;
+  }
+
+  .btn-ghost{ border:1px solid var(--ring); background:var(--surface); }
+  .btn-ghost:hover{ background:#eef6ff; }
+  @media (prefers-color-scheme: dark){ .btn-ghost:hover{ background:#111a24; } }
+
+  /* Offcanvas width */
+  @media (min-width: 992px){ .offcanvas-end.wide{ width: 520px; } }
+
+  /* Print-friendly gridlines */
+  @media print{
+    .navbar, .offcanvas, .btn, .pagination, .modal{ display:none !important; }
+    .excel-table thead th{ -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .excel-table, .excel-table th, .excel-table td{ border:1px solid #000 !important; }
+    body{ background:#fff; }
+  }
+</style>
+<link href="{{ url_for('static', filename='app_theme.css') }}" rel="stylesheet">
+</head>
+<body>
+
+<!-- Responsive Navbar -->
+<nav class="navbar navbar-expand-lg navbar-custom sticky-top">
+  <div class="container">
+    <a class="navbar-brand d-flex align-items-center gap-2" href="{{ url_for('admin_bp.dashboard') }}" style="color:var(--ink);">
+      <span class="d-inline-block" style="width:10px;height:10px;border-radius:50%;background:var(--brand)"></span>
+      <strong>Admin</strong>
+    </a>
+
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav"
+            aria-controls="mainNav" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div id="mainNav" class="collapse navbar-collapse">
+      <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+        <li class="nav-item">
+          <a class="nav-link {% if active_page=='dashboard' %}active{% endif %}" href="{{ url_for('admin_bp.dashboard') }}">
+            <i class="bi bi-speedometer2"></i> Dashboard
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if active_page=='create_form' %}active{% endif %}" href="{{ url_for('form_bp.builder') }}">
+            <i class="bi bi-plus-square"></i> Create Form
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="{{ url_for('groups_bp.index') }}">
+            <i class="bi bi-people"></i> Groups
+          </a>
+        </li>
+      </ul>
+
+      <div class="d-flex align-items-center gap-2">
+        <!-- Toggle Filters/Share offcanvas -->
+        <button class="btn btn-outline-secondary" type="button" data-bs-toggle="offcanvas"
+                data-bs-target="#filtersPanel" aria-controls="filtersPanel" title="Filters & Share">
+          <i class="bi bi-search"></i>
+        </button>
+
+        <!-- Open live form -->
+        <a class="btn btn-ghost d-none d-sm-inline-flex" href="{{ url_for('form_bp.render_form', slug=form.slug) }}" target="_blank">
+          <i class="bi bi-box-arrow-up-right"></i> Open Live Form
+        </a>
+
+        <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#exportModal">
+          <i class="bi bi-download"></i> Export
+        </button>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<div class="page container">
+  <!-- Header line under navbar -->
+  <div class="d-flex align-items-center flex-wrap gap-2 mb-3">
+    <a href="{{ url_for('admin_bp.dashboard') }}" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-arrow-left"></i> Back
+    </a>
+    <h1 class="h4 m-0">{{ form.title }}</h1>
+    <span class="badge rounded-pill text-bg-light badge-code">{{ form.slug }}</span>
+  </div>
+
+  <!-- KPI row -->
+  <div class="row g-3 mb-3">
+    <div class="col-6 col-md-3">
+      <div class="kpi">
+        <div class="d-flex justify-content-between align-items-center">
+          <span class="label">Total submissions</span>
+          <i class="bi bi-bar-chart"></i>
+        </div>
+        <div class="value">{{ total }}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Submissions table -->
+  <div class="cardx p-0 excel-wrap">
+    <div class="table-responsive">
+      <table class="excel-table table-sm align-middle m-0">
+        <colgroup>
+          <col style="width: 180px;">
+          {% for col in columns %}<col>{% endfor %}
+          <col style="width: 1%;">
+        </colgroup>
+        <thead>
+          <tr>
+            <th>Submitted At</th>
+            {% for col in columns %}
+              <th>{{ col.label }}</th>
+            {% endfor %}
+            <th class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="rows">
+          {% for s in submissions %}
+            <tr data-id="{{ s._id }}">
+              <td class="text-nowrap">{{ s.created_at_str }}</td>
+              {% for col in columns %}
+                {% set value = s.fields.get(col.id, '') %}
+                <td data-key="{{ col.id }}">
+                  {% if col.type == 'image' and value is mapping %}
+                    <button type="button" class="btn btn-sm btn-link p-0 image-link"
+                            data-image-url="{{ value.url or (url_for('form_bp.get_file', file_id=value.file_id) if value.file_id else '') }}"
+                            data-image-name="{{ value.original_name or 'Image' }}">
+                      <i class="bi bi-image"></i> {{ value.original_name or 'Image' }}
+                    </button>
+                  {% else %}
+                    {{ value }}
+                  {% endif %}
+                </td>
+              {% endfor %}
+              <td class="text-end col-actions">
+                <div class="btn-group btn-group-sm">
+                  <button class="btn btn-outline-primary" data-act="edit"><i class="bi bi-pencil-square"></i> Edit</button>
+                  <button class="btn btn-outline-danger" data-act="del" title="Delete"><i class="bi bi-trash"></i></button>
+                </div>
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="{{ 2 + (columns|length) }}" class="text-center text-muted py-5">No submissions yet.</td></tr>
+          {% endfor %}
+        </tbody>
+        {% if pages > 1 %}
+        <tfoot>
+          <tr>
+            <td colspan="{{ 2 + (columns|length) }}">
+              <div class="p-3 d-flex justify-content-between align-items-center">
+                <div class="text-muted">Showing page {{ page }} of {{ pages }} ({{ total }} total)</div>
+                <div class="d-flex gap-2">
+                  {% if page > 1 %}
+                    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_bp.view_form', slug=form.slug, q=q, per_page=per_page, page=page-1) }}">&laquo; Prev</a>
+                  {% endif %}
+                  {% if page < pages %}
+                    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin_bp.view_form', slug=form.slug, q=q, per_page=per_page, page=page+1) }}">Next &raquo;</a>
+                  {% endif %}
+                </div>
+              </div>
+            </td>
+          </tr>
+        </tfoot>
+        {% endif %}
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Offcanvas: Filters + Share -->
+<div class="offcanvas offcanvas-end wide" tabindex="-1" id="filtersPanel" aria-labelledby="filtersTitle">
+  <div class="offcanvas-header">
+    <h5 class="offcanvas-title" id="filtersTitle"><i class="bi bi-search"></i> Filters & Share</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+  </div>
+  <div class="offcanvas-body">
+    <!-- Share link -->
+    <div class="cardx p-3 mb-3">
+      <label class="form-label">Share link</label>
+      <div class="d-flex flex-wrap gap-2">
+        <input id="shareLink" class="form-control share-input" readonly value="{{ share_url }}">
+        <button id="copyBtn" class="btn btn-outline-secondary" type="button"><i class="bi bi-clipboard"></i> Copy</button>
+        <a class="btn btn-outline-primary" target="_blank" href="{{ share_url }}"><i class="bi bi-box-arrow-up-right"></i> Open</a>
+      </div>
+      <div id="copyNote" class="form-text text-success" style="display:none;">Link copied ✓</div>
+    </div>
+
+    <!-- Search / Filters -->
+    <div class="cardx p-3 mb-3">
+      <form class="row g-2 align-items-end search-bar" method="get" action="{{ url_for('admin_bp.view_form', slug=form.slug) }}">
+        <div class="col-12">
+          <label class="form-label small text-muted">Search in submissions</label>
+          <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-search"></i></span>
+            <input type="text" class="form-control" name="q" placeholder="Type name, email, phone, etc…" value="{{ q or '' }}">
+          </div>
+        </div>
+        <div class="col-6">
+          <label class="form-label small text-muted">Per page</label>
+          <select class="form-select" name="per_page">
+            {% for n in [20,50,100,200] %}
+              <option value="{{n}}" {% if per_page==n %}selected{% endif %}>Show {{n}}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <!-- Actions: Search + Reset -->
+        <div class="col-6 d-grid">
+          <label class="form-label small text-muted">&nbsp;</label>
+          <div class="d-flex gap-2">
+            <button class="btn btn-primary flex-fill" type="submit"><i class="bi bi-funnel"></i> Search</button>
+            <button class="btn btn-outline-secondary" type="button" id="resetFilters">
+              <i class="bi bi-arrow-counterclockwise"></i> Reset
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <!-- 🔍 Duplicate scanner -->
+    <div class="cardx p-3">
+      <label class="form-label small text-muted">Scan for duplicate submissions</label>
+      <p class="small text-muted mb-2">
+        Select one or more fields (e.g. name, email, phone). We’ll rebuild the table with only duplicates, grouped (A, B, C…).
+      </p>
+      <div class="mb-2">
+        <select id="dupFields" class="form-select" multiple size="4">
+          {% for col in columns if col.type != 'image' %}
+            <option value="{{ col.id }}">{{ col.label }}</option>
+          {% endfor %}
+        </select>
+        <div class="form-text small">
+          Tip: hold <kbd>Ctrl</kbd> (or <kbd>Cmd</kbd> on Mac) to select more than one field.
+        </div>
+      </div>
+      <div class="d-flex gap-2">
+        <button class="btn btn-outline-primary flex-fill" type="button" id="scanDupBtn">
+          <i class="bi bi-search"></i> Scan duplicates
+        </button>
+        <button class="btn btn-outline-secondary flex-fill" type="button" id="clearDupBtn">
+          <i class="bi bi-x-circle"></i> Clear duplicates view
+        </button>
+      </div>
+      <div id="dupSummary" class="small text-muted mt-2" style="display:none;"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Image Preview Modal -->
+<div class="modal fade" id="imageModal" tabindex="-1" aria-labelledby="imageTitle" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="imageTitle">Uploaded image</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body text-center">
+        <img id="imagePreview" class="img-fluid rounded" alt="Uploaded image preview" style="max-height:70vh;">
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Export Modal -->
+<div class="modal fade" id="exportModal" tabindex="-1" aria-labelledby="exportTitle" aria-hidden="true">
+  <div class="modal-dialog">
+    <form class="modal-content" method="post" action="{{ url_for('admin_bp.export_bundle', slug=form.slug) }}">
+      <div class="modal-header">
+        <h5 class="modal-title" id="exportTitle"><i class="bi bi-file-earmark-zip"></i> Export submissions</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body vstack gap-3">
+        <div>
+          <label class="form-label" for="imageNameField">Name downloaded images using</label>
+          <select class="form-select" id="imageNameField" name="image_name_field">
+            <option value="original">Original uploaded filename</option>
+            {% for col in columns if col.type != 'image' %}
+              <option value="{{ col.id }}">{{ col.label }}</option>
+            {% endfor %}
+          </select>
+          <div class="form-text">Duplicate names are numbered automatically so no image is overwritten.</div>
+        </div>
+        <div>
+          <label class="form-label" for="dataFormat">Other form fields</label>
+          <select class="form-select" id="dataFormat" name="data_format">
+            <option value="xlsx">Include as Excel</option>
+            <option value="pdf">Include as PDF</option>
+            <option value="none">Images only</option>
+          </select>
+        </div>
+        <div class="alert alert-info mb-0 small">Your ZIP will contain an <strong>images</strong> folder and the selected data file.</div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-primary" type="submit"><i class="bi bi-download"></i> Download ZIP</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="editTitle" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <form class="modal-content" id="editForm">
+      <div class="modal-header">
+        <h5 class="modal-title" id="editTitle"><i class="bi bi-pencil-square"></i> Edit submission</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="editFields" class="row g-3">
+          <!-- dynamic fields -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-primary" type="submit"><i class="bi bi-check2-circle"></i> Save changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<!-- Boot data as JSON (prevents JS linters from choking on Jinja) -->
+<script id="boot" type="application/json">
+  {{ {'slug': form.slug, 'columns': columns}|tojson }}
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+// ===== Boot data =====
+const BOOT = JSON.parse(document.getElementById('boot').textContent);
+const SLUG = BOOT.slug;
+const COLUMNS = BOOT.columns; // [{id,label,type}...]
+let currentMode = 'all'; // 'all' or 'duplicates';
+
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.display = 'block';
+  setTimeout(()=> { t.style.display = 'none'; }, 1400);
+}
+
+function renderCell(td, col, value){
+  td.textContent = '';
+  if(col.type === 'image' && value && typeof value === 'object'){
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'btn btn-sm btn-link p-0 image-link';
+    button.dataset.imageUrl = value.url || (value.file_id ? `/file/${value.file_id}` : '');
+    button.dataset.imageName = value.original_name || 'Image';
+    button.innerHTML = '<i class="bi bi-image"></i> ';
+    button.appendChild(document.createTextNode(value.original_name || 'Image'));
+    td.appendChild(button);
+  }else{
+    td.textContent = value == null ? '' : String(value);
+  }
+}
+
+// Copy share link
+const copyBtn = document.getElementById('copyBtn');
+if(copyBtn){
+  copyBtn.addEventListener('click', async ()=>{
+    const inp = document.getElementById('shareLink');
+    try{ await navigator.clipboard.writeText(inp.value); }catch(e){
+      inp.select(); document.execCommand('copy');
+    }
+    const note = document.getElementById('copyNote');
+    if(note){ note.style.display=''; setTimeout(()=> note.style.display='none', 1600); }
+  });
+}
+
+// Reset filters button — clears query params and reloads base URL
+const resetBtn = document.getElementById('resetFilters');
+if(resetBtn){
+  resetBtn.addEventListener('click', ()=>{
+    window.location.href = "{{ url_for('admin_bp.view_form', slug=form.slug) }}";
+  });
+}
+
+const tbody = document.getElementById('rows');
+const editModal = new bootstrap.Modal(document.getElementById('editModal'), {backdrop:'static'});
+let editingId = null;
+
+/* ===== Helper: create row element (works for "all" + "duplicates") ===== */
+function createRowElement(row, groupNo){
+  const tr = document.createElement('tr');
+  tr.dataset.id = row._id;
+
+  if(groupNo){
+    tr.classList.add('dup-row');
+  }
+
+  const fields = row.fields || row; // duplicates API has fields; list API is flattened
+
+  // Submitted at
+  const tdTime = document.createElement('td');
+  tdTime.className = 'text-nowrap';
+  tdTime.textContent = row.created_at_str || '';
+
+  if(groupNo){
+    const badge = document.createElement('span');
+    badge.className = 'dup-badge';
+    badge.textContent = groupIndexToLabel(groupNo);
+    tdTime.appendChild(badge);
+  }
+  tr.appendChild(tdTime);
+
+  // Data fields
+  COLUMNS.forEach(col=>{
+    const td = document.createElement('td');
+    td.dataset.key = col.id;
+    const v = (fields && fields[col.id] != null) ? fields[col.id] : '';
+    renderCell(td, col, v);
+    tr.appendChild(td);
+  });
+
+  // Action buttons
+  const tdAct = document.createElement('td');
+  tdAct.className = 'text-end col-actions';
+  tdAct.innerHTML = `
+    <div class="btn-group btn-group-sm">
+      <button class="btn btn-outline-primary" data-act="edit"><i class="bi bi-pencil-square"></i> Edit</button>
+      <button class="btn btn-outline-danger" data-act="del" title="Delete"><i class="bi bi-trash"></i></button>
+    </div>
+  `;
+  tr.appendChild(tdAct);
+
+  return tr;
+}
+
+/* ===== Row actions (edit/delete) ===== */
+tbody.addEventListener('click', (ev)=>{
+  const imageLink = ev.target.closest('.image-link');
+  if(imageLink){
+    document.getElementById('imageTitle').textContent = imageLink.dataset.imageName || 'Uploaded image';
+    document.getElementById('imagePreview').src = imageLink.dataset.imageUrl;
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('imageModal')).show();
+    return;
+  }
+  const btn = ev.target.closest('button[data-act]');
+  if(!btn) return;
+  const tr = ev.target.closest('tr[data-id]');
+  const id = tr?.dataset?.id;
+  if(!id) return;
+
+  if(btn.dataset.act === 'del'){
+    if(confirm('Delete this submission? This cannot be undone.')){
+      fetch(`/admin/forms/${encodeURIComponent(SLUG)}/submissions/${encodeURIComponent(id)}`, { method:'DELETE' })
+        .then(r=>r.json()).then(j=>{
+          if(j.ok){
+            tr.remove();
+            showToast('Deleted');
+          }else{
+            alert(j.error||'Delete failed');
+          }
+        }).catch(e=>{ console.error(e); alert('Network error'); });
+    }
+    return;
+  }
+
+  if(btn.dataset.act === 'edit'){
+    editingId = id;
+    // Build dynamic form from current row values
+    const wrap = document.getElementById('editFields');
+    wrap.innerHTML = '';
+    COLUMNS.filter(col=>col.type !== 'image').forEach(col=>{
+      const td = tr.querySelector(`td[data-key="${col.id}"]`);
+      const val = td ? td.textContent : '';
+      const field = document.createElement('div');
+      field.className = 'col-md-6';
+      field.innerHTML = `
+        <label class="form-label">${col.label}</label>
+        <input class="form-control" name="${col.id}" value="${val.replace(/"/g,'&quot;')}">
+      `;
+      wrap.appendChild(field);
+    });
+    editModal.show();
+  }
+});
+
+/* ===== Submit edit ===== */
+document.getElementById('editForm').addEventListener('submit', (e)=>{
+  e.preventDefault();
+  if(!editingId) return;
+
+  const data = new FormData(e.target);
+  const fields = {};
+  for(const [k,v] of data.entries()){ fields[k]=v; }
+
+  fetch(`/admin/forms/${encodeURIComponent(SLUG)}/submissions/${encodeURIComponent(editingId)}`, {
+    method:'PATCH',
+    headers:{ 'Content-Type':'application/json' },
+    body: JSON.stringify({ fields })
+  }).then(r=>r.json()).then(j=>{
+    if(!j.ok){ alert(j.error||'Update failed'); return; }
+    // Reflect in table
+    const tr = document.querySelector(`tr[data-id="${editingId}"]`);
+    if(tr){
+      Object.entries(fields).forEach(([k,v])=>{
+        const td = tr.querySelector(`td[data-key="${k}"]`);
+        if(td) td.textContent = v;
+      });
+    }
+    editModal.hide();
+    showToast('Updated');
+  }).catch(e=>{ console.error(e); alert('Network error'); });
+});
+
+/* ===== Duplicate scan with full rebuild ===== */
+function getSelectedDupFields(){
+  const sel = document.getElementById('dupFields');
+  if(!sel) return [];
+  return Array.from(sel.options).filter(o=>o.selected).map(o=>o.value);
+}
+
+// Helper: convert 1,2,3… -> A,B,C,…,AA,AB (simple)
+function groupIndexToLabel(idx){
+  let n = idx;
+  let label = '';
+  while(n > 0){
+    const rem = (n - 1) % 26;
+    label = String.fromCharCode(65 + rem) + label;
+    n = Math.floor((n - 1) / 26);
+  }
+  return label;
+}
+
+const scanDupBtn = document.getElementById('scanDupBtn');
+const clearDupBtn = document.getElementById('clearDupBtn');
+
+function renderDuplicates(groups, fieldIds){
+  currentMode = 'duplicates';
+  tbody.innerHTML = '';
+
+  let visibleCount = 0;
+  groups.forEach((g, idx)=>{
+    const groupNo = idx + 1; // 1-based
+    g.submissions.forEach(sub=>{
+      const tr = createRowElement(sub, groupNo);
+      tbody.appendChild(tr);
+      visibleCount++;
+    });
+  });
+
+  const summary = document.getElementById('dupSummary');
+  if(summary){
+    summary.style.display = '';
+    if(groups.length){
+      summary.innerHTML = `
+        Showing only duplicate submissions:
+        <span class="fw-semibold">${visibleCount}</span> row(s) in
+        <span class="fw-semibold">${groups.length}</span> group(s)
+        based on <code>${fieldIds.join(', ')}</code>.<br>
+        Each group is tagged with a letter (A, B, C…).
+      `;
+    }else{
+      summary.textContent = 'No duplicates found for the selected fields (across all submissions).';
+    }
+  }
+
+  showToast(groups.length ? 'Duplicates arranged by group' : 'No duplicates found');
+}
+
+// Reload full list (via API, no page reload)
+function reloadAllSubmissions(){
+  currentMode = 'all';
+  const summary = document.getElementById('dupSummary');
+  if(summary){
+    summary.style.display = 'none';
+    summary.textContent = '';
+  }
+
+  fetch(`/api/forms/${encodeURIComponent(SLUG)}/submissions?page=1&per_page=200`)
+    .then(r=>r.json())
+    .then(j=>{
+      if(!j.ok){
+        console.error(j);
+        return;
+      }
+      tbody.innerHTML = '';
+      j.rows.forEach(row=>{
+        const tr = createRowElement(row, null);
+        tbody.appendChild(tr);
+      });
+    })
+    .catch(e=>{
+      console.error(e);
+    });
+}
+
+if(scanDupBtn){
+  scanDupBtn.addEventListener('click', ()=>{
+    const fields = getSelectedDupFields();
+    if(!fields.length){
+      alert('Select at least one field to scan for duplicates.');
+      return;
+    }
+
+    const url = `/api/forms/${encodeURIComponent(SLUG)}/submissions/duplicates?fields=${encodeURIComponent(fields.join(','))}`;
+
+    fetch(url)
+      .then(r=>r.json())
+      .then(j=>{
+        if(!j.ok){
+          alert(j.error || 'Duplicate scan failed');
+          return;
+        }
+        if(!j.groups.length){
+          const summary = document.getElementById('dupSummary');
+          if(summary){
+            summary.style.display = '';
+            summary.textContent = 'No duplicates found for the selected fields (across all submissions).';
+          }
+          showToast('No duplicates found');
+          return;
+        }
+        // Rebuild table so groups are side-by-side
+        renderDuplicates(j.groups, j.field_ids);
+      })
+      .catch(e=>{
+        console.error(e);
+        alert('Network error while scanning duplicates');
+      });
+  });
+}
+
+if(clearDupBtn){
+  clearDupBtn.addEventListener('click', ()=>{
+    reloadAllSubmissions();
+    showToast('Back to full list');
+  });
+}
+</script>
+</body>
+</html>

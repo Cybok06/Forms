@@ -1,0 +1,745 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Form Designer • Builder</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="icon" href="https://store-images.s-microsoft.com/image/apps.44537.13628881801009959.f429098c-f6ba-4196-a164-1109adc458e8.5f1e249b-7942-4e1d-aa67-487271e222e5" type="image/x-icon">
+
+<style>
+  :root{
+    --ink:#0D1B46; --muted:#8A94A6; --ring:#E5EAF5; --soft:#EAF1FF; --brand:#356BEA; --ok:#16a34a;
+    --card:#ffffff; --shadow:0 12px 36px rgba(2,6,23,.08);
+    --radius-card:16px; --radius-chip:12px; --radius-btn:10px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --ink:#0D1B46; --muted:#8A94A6; --ring:#E5EAF5; --soft:#EAF1FF; --card:#ffffff;
+      --shadow:0 22px 60px rgba(53,107,234,.16);
+    }
+  }
+  body{ background:var(--soft); color:var(--ink); }
+  .page{ max-width:1100px; margin:32px auto; }
+  .cardx{ background:var(--card); border:1px solid var(--ring); border-radius:var(--radius-card); box-shadow:var(--shadow); }
+  .header-bar{ display:flex; align-items:center; justify-content:space-between; gap:1rem; }
+  .title-required:after{ content:" *"; color:#dc2626; }
+  .req-note{ color:#dc2626; font-weight:600; }
+
+  .btn-icon{ display:inline-flex; align-items:center; gap:.5rem; }
+  .btn-icon svg{ width:18px; height:18px; }
+
+  .chip{
+    border:1px dashed #cbd5e1; border-radius:var(--radius-chip); padding:.65rem .8rem;
+    display:flex; align-items:center; justify-content:space-between; gap:.75rem; background:#fff;
+  }
+  @media (prefers-color-scheme: dark){ .chip{ background:#0f1319; } }
+  .chip .meta small{ color:var(--muted); }
+  .icon-btn{ border:none; background:transparent; cursor:pointer; padding:.35rem; border-radius:8px; }
+  .icon-btn:hover{ background:rgba(0,0,0,.05); }
+  @media (prefers-color-scheme: dark){ .icon-btn:hover{ background:rgba(255,255,255,.06); } }
+  .icon-btn svg{ width:18px; height:18px; color:var(--ink); }
+
+  .image-preview{ max-height:140px; object-fit:cover; border-radius:10px; border:1px solid var(--ring); }
+  .ad-preview{ width:100%; max-height:180px; object-fit:cover; border-radius:16px; border:1px solid var(--ring); }
+  .ad-panel[aria-disabled="true"]{ opacity:.62; }
+
+  .theme-list{ display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:.75rem; }
+  @media (max-width:992px){ .theme-list{ grid-template-columns:repeat(3,minmax(0,1fr)); } }
+  @media (max-width:576px){ .theme-list{ grid-template-columns:repeat(2,minmax(0,1fr)); } }
+
+  .theme-card{
+    border:1px solid var(--ring); border-radius:12px; padding:.6rem; cursor:pointer; user-select:none;
+    background:#fff; position:relative;
+  }
+  @media (prefers-color-scheme: dark){ .theme-card{ background:#0f1319; } }
+  .theme-card:hover{ box-shadow:0 8px 18px rgba(2,6,23,.08); }
+  .theme-top{ height:20px; border-radius:8px; }
+  .theme-swatches{ display:flex; align-items:center; gap:6px; margin-top:8px; }
+  .sw{ width:10px; height:10px; border-radius:50%; border:1px solid rgba(0,0,0,.08); }
+  .theme-name{ margin-top:6px; font-size:.85rem; color:var(--muted); }
+  .theme-check{
+    position:absolute; top:6px; right:6px; width:18px; height:18px; border-radius:50%;
+    border:1px solid var(--ring); background:#fff; display:grid; place-items:center;
+  }
+  @media (prefers-color-scheme: dark){ .theme-check{ background:#0f1319; } }
+  .theme-card[aria-checked="true"]{ outline:2px solid color-mix(in srgb, var(--brand) 50%, transparent); }
+  .theme-card[aria-checked="true"] .theme-check{ border-color:var(--brand); }
+  .theme-card[aria-checked="true"] .theme-check svg{ color:var(--brand); }
+
+  .pv-wrap{
+    --pv-ink:var(--ink); --pv-muted:var(--muted); --pv-ring:var(--ring); --pv-soft:var(--soft);
+    --pv-brand:var(--brand); --pv-ok:var(--ok);
+  }
+  .pv-title{ color:var(--pv-ink); }
+  .pv-input{ border:1px solid var(--pv-ring); }
+  .pv-label{ color:var(--pv-ink); }
+  .pv-hint{ color:var(--pv-muted); }
+  .pv-accent{ background:linear-gradient(90deg,var(--pv-brand),var(--pv-ok)); height:3px; border-radius:8px; }
+  .muted{ color:var(--muted); }
+</style>
+<link href="{{ url_for('static', filename='app_theme.css') }}" rel="stylesheet">
+</head>
+<body>
+<div class="page container">
+  <div class="header-bar mb-3">
+    <div class="d-flex align-items-center gap-2">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <rect x="3" y="4" width="18" height="16" rx="3"/>
+        <path d="M7 8h10M7 12h6M7 16h8" stroke-linecap="round"/>
+      </svg>
+      <h1 class="h4 m-0">Form Designer</h1>
+    </div>
+    <div class="d-flex gap-2">
+      <a id="viewPublicBtn" class="btn btn-outline-secondary btn-sm" href="#" target="_blank" style="display:none;">
+        View Public
+      </a>
+      <button id="saveBtn" class="btn btn-primary btn-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M5 12h14M12 5v14" stroke-linecap="round"/></svg>
+        <span id="saveLabel">Save Form</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Title + Optional Description + Optional Image -->
+  <div class="cardx p-3 mb-3">
+    <div class="row g-3 align-items-end">
+      <div class="col-lg-4">
+        <label class="form-label title-required">Form Title</label>
+        <input id="formTitle" class="form-control" placeholder="e.g., Customer Onboarding Form"/>
+        <div class="form-text"><span class="req-note">Required.</span></div>
+      </div>
+      <div class="col-lg-5">
+        <label class="form-label">Description (optional)</label>
+        <input id="formDesc" class="form-control" placeholder="Brief description visible under the title"/>
+        <div class="form-text muted">A short sentence to guide respondents.</div>
+      </div>
+      <div class="col-lg-3">
+        <label class="form-label">Form Image (optional)</label>
+        <input id="formImage" type="file" class="form-control" accept="image/*"/>
+        <div class="form-text">Uploaded to the configured image service; shows above the form title.</div>
+
+        <div class="mt-2" id="imgState" style="display:none;">
+          <div class="d-flex align-items-center gap-2">
+            <div class="spinner-border spinner-border-sm text-primary" role="status" aria-hidden="true"></div>
+            <small class="text-muted" id="imgStateText">Uploading…</small>
+          </div>
+        </div>
+        <div class="mt-2" id="imgWrap" style="display:none;">
+          <img id="imgPreview" class="image-preview" src="" alt="preview"/>
+          <div class="mt-1"><small class="text-muted" id="imgStatusNote">Uploaded ✓</small></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Theme Picker -->
+  <div class="cardx p-3 mb-3">
+    <div class="d-flex align-items-center justify-content-between mb-2">
+      <strong>Theme</strong>
+      <small class="text-muted">Pick a palette — applied to the form UI</small>
+    </div>
+    <div id="themeList" class="theme-list"></div>
+  </div>
+
+  <!-- Optional Ad -->
+  <div class="cardx p-3 mb-3">
+    <div class="d-flex align-items-start justify-content-between gap-3 flex-wrap mb-3">
+      <div>
+        <strong>Submission Ad</strong>
+        <div class="form-text muted">Show an image ad two seconds after the submitted screen appears.</div>
+      </div>
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" role="switch" id="adEnabled">
+        <label class="form-check-label fw-semibold" for="adEnabled">Enable ad</label>
+      </div>
+    </div>
+
+    <div id="adPanel" class="ad-panel" aria-disabled="true">
+      <div class="row g-3 align-items-end">
+        <div class="col-lg-5">
+          <label class="form-label">Ad Image</label>
+          <input id="adImage" type="file" class="form-control" accept="image/*" disabled>
+          <div class="form-text">Required when ads are enabled. JPG, PNG, WebP, or GIF.</div>
+          <div class="mt-2" id="adState" style="display:none;">
+            <div class="d-flex align-items-center gap-2">
+              <div class="spinner-border spinner-border-sm text-primary" role="status" aria-hidden="true"></div>
+              <small class="text-muted" id="adStateText">Uploading...</small>
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-4">
+          <label class="form-label">Redirect Link (optional)</label>
+          <input id="adRedirectUrl" type="url" class="form-control" placeholder="https://example.com" disabled>
+          <div class="form-text">If provided, clicking the ad redirects to this link. It also auto-redirects after 7 seconds.</div>
+        </div>
+        <div class="col-lg-3">
+          <div id="adWrap" style="display:none;">
+            <img id="adPreview" class="ad-preview" src="" alt="Ad preview">
+            <div class="mt-1"><small class="text-muted" id="adStatusNote">Uploaded</small></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Field designer -->
+  <div class="row g-3">
+    <div class="col-lg-5">
+      <div class="cardx p-3">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <div class="d-flex align-items-center gap-2">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <rect x="3" y="4" width="18" height="16" rx="3"/>
+              <path d="M7 8h10M7 12h6M7 16h8" stroke-linecap="round"/>
+            </svg>
+            <strong>Add Field</strong>
+          </div>
+        </div>
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label">Label</label>
+            <input id="fLabel" class="form-control" placeholder="Full Name"/>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Type</label>
+            <select id="fType" class="form-select">
+              <option value="text">Text</option>
+              <option value="number">Number</option>
+              <option value="email">Email</option>
+              <option value="tel">Phone</option>
+              <option value="date">Date</option>
+              <option value="textarea">Textarea</option>
+              <option value="select">Select (Dropdown)</option>
+              <option value="image">Image Upload</option>
+            </select>
+          </div>
+
+          <!-- Options area (shown when type = select) -->
+          <div class="col-12" id="optionsWrap" style="display:none;">
+            <label class="form-label">Options</label>
+            <textarea id="fOptions" class="form-control" rows="3" placeholder="Male
+Female
+Prefer not to say"></textarea>
+            <div class="form-text">
+              One option per line (or comma-separated). First value will be the default unless changed later.
+            </div>
+            <div class="mt-2">
+              <label class="form-label">Default (optional)</label>
+              <input id="fDefault" class="form-control" placeholder="(must match one of the options)"/>
+            </div>
+          </div>
+
+          <div class="col-12">
+            <label class="form-label">Placeholder</label>
+            <input id="fPlaceholder" class="form-control" placeholder="e.g., Enter your full name"/>
+            <div class="form-text">Ignored for Select and Image fields.</div>
+          </div>
+          <div class="col-6">
+            <label class="form-label">Required</label>
+            <select id="fRequired" class="form-select">
+              <option value="false">No</option>
+              <option value="true">Yes</option>
+            </select>
+          </div>
+          <div class="col-6">
+            <label class="form-label">Format (mask)</label>
+            <input id="fFormat" class="form-control" placeholder="e.g., 0XXXXXXXX"/>
+            <div class="form-text">X = digit, A = letter, * = any char (not used for Select/Date/Textarea/Image).</div>
+          </div>
+          <div class="col-12 d-grid">
+            <button id="addFieldBtn" class="btn btn-dark btn-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>
+              Add Field
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live Preview (list of field chips) -->
+    <div class="col-lg-7">
+      <div class="cardx p-3 pv-wrap" id="pvWrap">
+        <div class="d-flex align-items-center justify-content-between">
+          <strong>Preview</strong>
+          <small class="text-muted">Use arrow icons to reorder fields</small>
+        </div>
+        <div class="pv-accent mt-2 mb-3"></div>
+        <div class="mb-2">
+          <h3 id="pvTitle" class="h5 pv-title">Your Form Title</h3>
+          <p id="pvDesc" class="mb-0 pv-hint" style="display:none;"></p>
+        </div>
+        <div id="pvFields" class="vstack gap-2"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script id="__config" type="application/json">
+{{ {'edit_slug': edit_slug}|tojson }}
+</script>
+
+<script>
+(function(){
+  const __cfgEl = document.getElementById('__config');
+  let __cfg = {};
+  try { __cfg = JSON.parse(__cfgEl?.textContent || '{}'); } catch {}
+  const EDIT_SLUG = __cfg.edit_slug || null;
+
+  const state = {
+    title: "",
+    description: "",
+    form_image_id: null,
+    ad: {
+      enabled: false,
+      image_id: null,
+      redirect_url: ""
+    },
+    theme: null,
+    fields: [],
+    editSlug: EDIT_SLUG
+  };
+
+  const THEMES = [
+    { key:"royal", name:"Royal Blue", brand:"#356BEA", ok:"#7EA8FF", ink:"#0D1B46", muted:"#8A94A6", ring:"#E5EAF5", soft:"#EAF1FF" },
+    { key:"sky", name:"Sky Blue", brand:"#4C7DF0", ok:"#9AB8FF", ink:"#0D1B46", muted:"#8A94A6", ring:"#E5EAF5", soft:"#EDF5FF" },
+    { key:"navy", name:"Deep Navy", brand:"#0D1B46", ok:"#356BEA", ink:"#0D1B46", muted:"#8A94A6", ring:"#E5EAF5", soft:"#EAF1FF" },
+    { key:"aqua", name:"Aqua Blue", brand:"#2F80ED", ok:"#7EA8FF", ink:"#0D1B46", muted:"#8A94A6", ring:"#DCE8FF", soft:"#F0F6FF" },
+    { key:"soft", name:"Soft Blue", brand:"#7EA8FF", ok:"#356BEA", ink:"#0D1B46", muted:"#8A94A6", ring:"#E5EAF5", soft:"#F5F8FF" },
+    { key:"steel", name:"Steel Blue", brand:"#355D9F", ok:"#7EA8FF", ink:"#0D1B46", muted:"#8A94A6", ring:"#E5EAF5", soft:"#EAF1FF" }
+  ];
+
+  const $ = (s)=>document.querySelector(s);
+  const pvFields = $("#pvFields");
+  const pvWrap = $("#pvWrap");
+
+  function uid(){ return "f_" + Math.random().toString(36).slice(2,9); }
+
+  // Title & description
+  function syncTitle(){
+    const t = $("#formTitle").value.trim();
+    state.title = t;
+    $("#pvTitle").innerText = t || "Your Form Title";
+  }
+  $("#formTitle").addEventListener("input", syncTitle);
+
+  function syncDesc(){
+    const d = $("#formDesc").value.trim();
+    state.description = d;
+    const el = $("#pvDesc");
+    if(d){ el.style.display = ""; el.innerText = d; }
+    else{ el.style.display = "none"; el.innerText = ""; }
+  }
+  $("#formDesc").addEventListener("input", syncDesc);
+
+  // Theme picker
+  function renderThemes(){
+    const wrap = $("#themeList");
+    wrap.innerHTML = "";
+    THEMES.forEach((th)=>{
+      const c = document.createElement("button");
+      c.type = "button";
+      c.className = "theme-card";
+      const checked = state.theme && state.theme.key === th.key;
+      c.setAttribute("role","radio");
+      c.setAttribute("aria-checked", checked ? "true" : "false");
+      c.innerHTML = `
+        <div class="theme-top" style="background: linear-gradient(90deg, ${th.brand}, ${th.ok});"></div>
+        <div class="theme-swatches">
+          <span class="sw" style="background:${th.ink}"></span>
+          <span class="sw" style="background:${th.muted}"></span>
+          <span class="sw" style="background:${th.ring}"></span>
+          <span class="sw" style="background:${th.soft}"></span>
+        </div>
+        <div class="theme-name">${th.name}</div>
+        <div class="theme-check" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M5 12l4 4L19 6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+      `;
+      c.addEventListener("click", ()=> selectTheme(th));
+      wrap.appendChild(c);
+    });
+  }
+  function selectTheme(th){
+    state.theme = {...th};
+    pvWrap.style.setProperty('--pv-ink', th.ink);
+    pvWrap.style.setProperty('--pv-muted', th.muted);
+    pvWrap.style.setProperty('--pv-ring', th.ring);
+    pvWrap.style.setProperty('--pv-soft', th.soft);
+    pvWrap.style.setProperty('--pv-brand', th.brand);
+    pvWrap.style.setProperty('--pv-ok', th.ok);
+    [...document.querySelectorAll('.theme-card')].forEach(el=>el.setAttribute('aria-checked','false'));
+    const i = THEMES.findIndex(t=>t.key===th.key);
+    const el = document.querySelectorAll('.theme-card')[i];
+    if(el) el.setAttribute('aria-checked','true');
+  }
+
+  // Image upload
+  const formImageInput = $("#formImage");
+  const imgWrap = $("#imgWrap");
+  const imgPreview = $("#imgPreview");
+  const imgState = $("#imgState");
+  const imgStateText = $("#imgStateText");
+  const imgStatusNote = $("#imgStatusNote");
+
+  formImageInput.addEventListener("change", async ()=>{
+    const file = formImageInput.files && formImageInput.files[0];
+    if(!file) return;
+    if(!file.type.startsWith("image/")){
+      alert("Please choose a valid image file.");
+      formImageInput.value = "";
+      return;
+    }
+    setUploading(true);
+    const fd = new FormData();
+    fd.append("image", file);
+    try{
+      const res = await fetch("/api/upload", { method:"POST", body:fd });
+      const data = await res.json();
+      if(!res.ok || !data.ok) throw new Error(data.error || "Upload failed");
+      state.form_image_id = data.file_id;
+      imgWrap.style.display = "";
+      imgPreview.src = `/file/${data.file_id}`;
+      imgStatusNote.textContent = "Uploaded ✓";
+      toast("Image uploaded");
+    }catch(err){
+      console.error(err);
+      toast("Image upload failed");
+      formImageInput.value = "";
+    }finally{
+      setUploading(false);
+    }
+  });
+
+  function setUploading(isUploading){
+    if(isUploading){
+      imgState.style.display = "";
+      imgWrap.style.display = "none";
+      imgStateText.textContent = "Uploading…";
+      formImageInput.disabled = true;
+    }else{
+      imgState.style.display = "none";
+      formImageInput.disabled = false;
+    }
+  }
+
+  // Optional submission ad
+  const adEnabled = $("#adEnabled");
+  const adPanel = $("#adPanel");
+  const adImageInput = $("#adImage");
+  const adRedirectUrl = $("#adRedirectUrl");
+  const adWrap = $("#adWrap");
+  const adPreview = $("#adPreview");
+  const adState = $("#adState");
+  const adStateText = $("#adStateText");
+  const adStatusNote = $("#adStatusNote");
+
+  function syncAdEnabled(){
+    state.ad.enabled = !!adEnabled.checked;
+    adPanel.setAttribute("aria-disabled", state.ad.enabled ? "false" : "true");
+    adImageInput.disabled = !state.ad.enabled;
+    adRedirectUrl.disabled = !state.ad.enabled;
+  }
+
+  adEnabled.addEventListener("change", syncAdEnabled);
+  adRedirectUrl.addEventListener("input", ()=>{
+    state.ad.redirect_url = adRedirectUrl.value.trim();
+  });
+
+  adImageInput.addEventListener("change", async ()=>{
+    const file = adImageInput.files && adImageInput.files[0];
+    if(!file) return;
+    if(!file.type.startsWith("image/")){
+      alert("Please choose a valid image file.");
+      adImageInput.value = "";
+      return;
+    }
+    setAdUploading(true);
+    const fd = new FormData();
+    fd.append("image", file);
+    try{
+      const res = await fetch("/api/upload", { method:"POST", body:fd });
+      const data = await res.json();
+      if(!res.ok || !data.ok) throw new Error(data.error || "Upload failed");
+      state.ad.image_id = data.file_id;
+      adWrap.style.display = "";
+      adPreview.src = `/file/${data.file_id}`;
+      adStatusNote.textContent = "Uploaded";
+      toast("Ad image uploaded");
+    }catch(err){
+      console.error(err);
+      toast("Ad image upload failed");
+      adImageInput.value = "";
+    }finally{
+      setAdUploading(false);
+    }
+  });
+
+  function setAdUploading(isUploading){
+    if(isUploading){
+      adState.style.display = "";
+      adStateText.textContent = "Uploading...";
+      adImageInput.disabled = true;
+    }else{
+      adState.style.display = "none";
+      adImageInput.disabled = !state.ad.enabled;
+    }
+  }
+
+  // ===== Field builder =====
+  const fType = $("#fType");
+  const optionsWrap = $("#optionsWrap");
+  const fOptions = $("#fOptions");
+  const fDefault = $("#fDefault");
+
+  function toggleOptions(){
+    const t = fType.value;
+    if(t === "select"){
+      optionsWrap.style.display = "";
+    }else{
+      optionsWrap.style.display = "none";
+      fOptions.value = "";
+      fDefault.value = "";
+    }
+  }
+  fType.addEventListener("change", toggleOptions);
+  toggleOptions();
+
+  function parseOptions(text){
+    const parts = text.split(/\n|,/).map(s => s.trim()).filter(Boolean);
+    // unique, preserve order
+    const seen = new Set();
+    const out = [];
+    for(const p of parts){
+      const key = p.toLowerCase();
+      if(seen.has(key)) continue;
+      seen.add(key);
+      out.push(p.slice(0,80));
+      if(out.length >= 100) break;
+    }
+    return out;
+  }
+
+  function fieldChip(f){
+    const div = document.createElement("div");
+    const fmt = f.format ? ` <small class="text-muted">[${f.format}]</small>` : "";
+    const optInfo = (f.type === "select" && Array.isArray(f.options) && f.options.length)
+      ? ` <small class="text-muted">• options: ${f.options.slice(0,4).join(", ")}${f.options.length>4?"…":""}</small>`
+      : "";
+    const defInfo = (f.type === "select" && f.default) ? ` <small class="text-muted">• default: ${f.default}</small>` : "";
+    div.className = "chip";
+    div.innerHTML = `
+      <div class="meta">
+        <strong>${f.label}</strong> <small>(${f.type})</small>${fmt}${optInfo}${defInfo}
+        ${f.required ? ` <small class="text-danger">• required</small>` : ``}
+      </div>
+      <div class="act d-flex align-items-center gap-1">
+        <button class="icon-btn" data-act="up" title="Move up" aria-label="Move up">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 19V5M5 12l7-7 7 7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button class="icon-btn" data-act="down" title="Move down" aria-label="Move down">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 5v14M5 12l7 7 7-7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button class="icon-btn" data-act="del" title="Delete field" aria-label="Delete field">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M10 11v6M14 11v6" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+    `;
+    div.querySelector(".act").addEventListener("click", (e)=>{
+      const btn = e.target.closest('button[data-act]');
+      if(!btn) return;
+      const act = btn.getAttribute("data-act");
+      const idx = state.fields.findIndex(x=>x.id===f.id);
+      if(idx<0) return;
+      if(act==="del"){ state.fields.splice(idx,1); renderFields(); return; }
+      if(act==="up" && idx>0){ [state.fields[idx-1],state.fields[idx]]=[state.fields[idx],state.fields[idx-1]]; renderFields(); }
+      if(act==="down" && idx<state.fields.length-1){ [state.fields[idx+1],state.fields[idx]]=[state.fields[idx],state.fields[idx+1]]; renderFields(); }
+    });
+    return div;
+  }
+
+  function renderFields(){
+    pvFields.innerHTML = "";
+    state.fields.forEach(f=> pvFields.appendChild(fieldChip(f)));
+  }
+
+  $("#addFieldBtn").addEventListener("click", ()=>{
+    const label = $("#fLabel").value.trim();
+    if(!label){ alert("Label is required."); $("#fLabel").focus(); return; }
+    const type = $("#fType").value;
+    const id = uid(); // temp id; server derives final id from label
+    const required = $("#fRequired").value === "true";
+    const f = { id, label, type, required };
+
+    // Placeholder (ignored for select)
+    const ph = $("#fPlaceholder").value.trim();
+    if(ph && !["select", "image"].includes(type)) f.placeholder = ph;
+
+    // Mask (not for select/date/textarea)
+    const fmt = $("#fFormat").value.trim();
+    if(fmt && !["select","date","textarea","image"].includes(type)) f.format = fmt;
+
+    if(type === "select"){
+      const opts = parseOptions($("#fOptions").value);
+      if(opts.length === 0){
+        alert("Add at least one option for the Select field.");
+        $("#fOptions").focus();
+        return;
+      }
+      f.options = opts;
+      const def = $("#fDefault").value.trim();
+      if(def && opts.includes(def)) f.default = def;
+    }
+
+    state.fields.push(f);
+    renderFields();
+
+    // reset inputs
+    ["#fLabel","#fPlaceholder","#fFormat","#fOptions","#fDefault"].forEach(s=> $(s).value="");
+    $("#fRequired").value = "false"; $("#fType").value = "text"; toggleOptions();
+  });
+
+  // Save (Create or Update)
+  $("#saveBtn").addEventListener("click", async ()=>{
+    if(!state.title){ alert("Form Title is required."); $("#formTitle").focus(); return; }
+    if(state.fields.length === 0){ alert("Add at least one field."); return; }
+    if(state.ad.enabled && !state.ad.image_id){
+      alert("Upload an ad image or turn off ads.");
+      adImageInput.focus();
+      return;
+    }
+    if(state.ad.enabled && state.ad.redirect_url){
+      try{
+        const adUrl = new URL(state.ad.redirect_url);
+        if(!["http:", "https:"].includes(adUrl.protocol)) throw new Error("Invalid protocol");
+      }catch(e){
+        alert("Enter a valid ad redirect link starting with http:// or https://.");
+        adRedirectUrl.focus();
+        return;
+      }
+    }
+
+    const payload = {
+      title: state.title,
+      description: state.description || null,
+      theme: state.theme || null,
+      form_image_id: state.form_image_id || null,
+      ad: {
+        enabled: !!state.ad.enabled,
+        image_id: state.ad.enabled ? state.ad.image_id : null,
+        redirect_url: state.ad.enabled ? (state.ad.redirect_url || "").trim() : ""
+      },
+      fields: state.fields
+    };
+
+    try{
+      let res, data;
+      if(state.editSlug){
+        res = await fetch(`/api/forms/${encodeURIComponent(state.editSlug)}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+      }else{
+        res = await fetch("/api/forms", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+      }
+      data = await res.json();
+      if(!data.ok){ alert(data.error || "Save failed"); return; }
+      window.location = data.view_url;
+    }catch(e){ console.error(e); alert("Network error"); }
+  });
+
+  // Prefill in edit mode
+  async function prefillIfEditing(){
+    if(!state.editSlug){
+      state.theme = {...THEMES[0]};
+      renderThemes(); selectTheme(THEMES[0]);
+      syncTitle(); syncDesc();
+      return;
+    }
+    $("#saveLabel").innerText = "Update Form";
+    $("#viewPublicBtn").style.display = "";
+    $("#viewPublicBtn").href = `/f/${encodeURIComponent(state.editSlug)}`;
+
+    try{
+      const res = await fetch(`/api/forms/${encodeURIComponent(state.editSlug)}`);
+      const data = await res.json();
+      if(!data.ok){ alert(data.error || "Failed to load form"); return; }
+
+      const form = data.form || {};
+      $("#formTitle").value = form.title || "";
+      $("#formDesc").value = form.description || "";
+      syncTitle(); syncDesc();
+
+      const th = form.theme || null;
+      state.theme = th ? {...th} : {...THEMES[0]};
+      renderThemes();
+      const match = THEMES.find(t => t.key === (state.theme.key || "")) || THEMES[0];
+      selectTheme(match);
+
+      if(form.form_image_id){
+        state.form_image_id = form.form_image_id;
+        imgWrap.style.display = "";
+        imgPreview.src = form.form_image_url || `/file/${form.form_image_id}`;
+        imgStatusNote.textContent = "Uploaded ✓";
+      }
+
+      const ad = form.ad || {};
+      state.ad = {
+        enabled: !!ad.enabled,
+        image_id: ad.image_id || null,
+        redirect_url: ad.redirect_url || ""
+      };
+      adEnabled.checked = state.ad.enabled;
+      adRedirectUrl.value = state.ad.redirect_url;
+      syncAdEnabled();
+      if(state.ad.image_id){
+        adWrap.style.display = "";
+        adPreview.src = ad.image_url || `/file/${state.ad.image_id}`;
+        adStatusNote.textContent = "Uploaded";
+      }
+
+      const fs = Array.isArray(form.fields) ? form.fields : [];
+      state.fields = fs.map(f => ({
+        id: f.id || uid(),
+        label: f.label || "",
+        type: f.type || "text",
+        required: !!f.required,
+        placeholder: f.placeholder || "",
+        format: f.format || "",
+        options: Array.isArray(f.options) ? f.options : undefined,
+        default: f.default || undefined
+      }));
+      renderFields();
+    }catch(e){
+      console.error(e);
+      alert("Network error while loading form.");
+    }
+  }
+
+  function toast(msg){
+    const b=document.createElement('div');
+    b.textContent=msg;
+    b.style.position='fixed'; b.style.bottom='16px'; b.style.right='16px';
+    b.style.background='var(--card)'; b.style.border='1px solid var(--ring)';
+    b.style.padding='8px 12px'; b.style.borderRadius='10px';
+    b.style.boxShadow='0 8px 20px rgba(2,6,23,.15)'; b.style.color='var(--ink)';
+    b.style.zIndex=9999;
+    document.body.appendChild(b);
+    setTimeout(()=>b.remove(),1400);
+  }
+
+  renderThemes();
+  syncAdEnabled();
+  prefillIfEditing();
+})();
+</script>
+</body>
+</html>
